@@ -57,9 +57,9 @@ namespace NativeGamepadServer
                             string tagName = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
                             string htmlUrl = doc.RootElement.GetProperty("html_url").GetString() ?? "";
                             
-                            // Dynamically read version from AssemblyInformationalVersionAttribute
-                            string localVersion = "v" + (System.Reflection.Assembly.GetExecutingAssembly()
-                                .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0");
+                            // Dynamically read version safely for single-file executables
+                            var versionObj = typeof(MainWindow).Assembly.GetName().Version;
+                            string localVersion = "v" + (versionObj != null ? $"{versionObj.Major}.{versionObj.Minor}.{versionObj.Build}" : "0.0.0");
                             
                             if (!string.IsNullOrEmpty(tagName) && tagName != localVersion)
                             {
