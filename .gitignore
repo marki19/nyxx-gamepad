@@ -17,7 +17,12 @@ installer/Output/
 *.bak
 
 # IDE / OS
+.idea/
 .vs/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Workspace Data
+.agents/
+scratch/

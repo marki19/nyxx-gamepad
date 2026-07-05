@@ -62,3 +62,7 @@ cd client
 ## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+## 🙌 Acknowledgements
+
+NyxxPad utilizes the excellent **ViGEmBus** driver (Copyright © Nefarius Software Solutions e.U.) for Windows gamepad emulation. Please see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) for license details.

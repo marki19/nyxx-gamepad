@@ -1,4 +1,0 @@
-C:\Programming Projects\personal projects\NativeGamepad\TestEnum\obj\Debug\net8.0\TestEnum.GeneratedMSBuildEditorConfig.editorconfig
-C:\Programming Projects\personal projects\NativeGamepad\TestEnum\obj\Debug\net8.0\TestEnum.AssemblyInfoInputs.cache
-C:\Programming Projects\personal projects\NativeGamepad\TestEnum\obj\Debug\net8.0\TestEnum.AssemblyInfo.cs
-C:\Programming Projects\personal projects\NativeGamepad\TestEnum\obj\Debug\net8.0\TestEnum.csproj.CoreCompileInputs.cache
