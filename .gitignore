@@ -1,0 +1,23 @@
+# .NET Core
+server/bin/
+server/obj/
+
+# Android / Gradle
+client/.gradle/
+client/build/
+client/app/build/
+client/local.properties
+client/.idea/
+client/app/release.keystore
+
+# Build Outputs & Temp
+builds/
+installer/Output/
+*.tmp
+*.bak
+
+# IDE / OS
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
