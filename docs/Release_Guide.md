@@ -11,7 +11,7 @@ We want to build a fully standalone, single-file executable. This ensures that u
 **Command:**
 Open your terminal, navigate to the `server/` directory, and run:
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
 **Output:**
@@ -47,11 +47,16 @@ To generate this file for the first time:
 3. Choose **APK** and click Next.
 4. Under "Key store path", click **Create new...**
 5. Save the file exactly as `release.keystore` inside your `client/app/` folder.
-6. Set the password for both the store and the key alias to exactly: `manchae19`
-7. Set the Alias to exactly: `nyxxpad`
-8. Fill out at least one certificate field (like your name or org) and click OK.
+6. Set a strong password for both the store and the key.
+7. Set the Alias to `nyxxpad`.
+8. Fill out at least one certificate field and click OK.
+9. Open `client/local.properties` (create it if it doesn't exist) and add the following lines with your newly chosen password:
+   ```properties
+   KEYSTORE_PASSWORD=YourChosenPasswordHere
+   KEYSTORE_ALIAS=nyxxpad
+   ```
 
-Once that file is created, you can easily build highly optimized release versions anytime:
+Once that file is created and the password is set in `local.properties`, you can easily build highly optimized release versions anytime:
 ```bash
 ./gradlew assembleRelease
 ```

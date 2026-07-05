@@ -12,15 +12,21 @@ android {
         minSdk = 28
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.0-beta"
+        versionName = "0.1.0"
+    }
+
+    val localProperties = java.util.Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(java.io.FileInputStream(localPropertiesFile))
     }
 
     signingConfigs {
         create("release") {
             storeFile = file("release.keystore")
-            storePassword = "manchae19"
-            keyAlias = "nyxxpad"
-            keyPassword = "manchae19"
+            storePassword = localProperties.getProperty("KEYSTORE_PASSWORD") ?: ""
+            keyAlias = localProperties.getProperty("KEYSTORE_ALIAS") ?: "nyxxpad"
+            keyPassword = localProperties.getProperty("KEYSTORE_PASSWORD") ?: ""
         }
     }
 

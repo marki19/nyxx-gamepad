@@ -8,7 +8,7 @@ client/build/
 client/app/build/
 client/local.properties
 client/.idea/
-client/app/release.keystore
+*.keystore
 
 # Build Outputs & Temp
 builds/
