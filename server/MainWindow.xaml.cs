@@ -42,9 +42,8 @@ namespace NativeGamepadServer
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "NyxxPadServer-Updater");
                     
-                    // REPLACE THESE WITH YOUR ACTUAL GITHUB INFO
-                    string repoOwner = "YOUR_GITHUB_USERNAME"; 
-                    string repoName = "NativeGamepad";
+                    string repoOwner = "marki19"; 
+                    string repoName = "nyxx-gamepad";
                     
                     string url = $"https://api.github.com/repos/{repoOwner}/{repoName}/releases/latest";
                     
