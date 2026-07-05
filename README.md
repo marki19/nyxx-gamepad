@@ -1,6 +1,6 @@
 # NyxxPad 🎮
 
-![Vibe Coded](https://img.shields.io/badge/Vibe_Coded-AI_Assisted-8A2BE2?style=for-the-badge&logo=openai)
+![AI Assisted](https://img.shields.io/badge/AI-Assisted-8A2BE2?style=for-the-badge&logo=openai)
 
 NyxxPad is a high-performance, ultra-low latency application that instantly turns your Android phone into a fully functional Xbox 360 controller for your Windows PC.
 
@@ -67,6 +67,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 🙌 Acknowledgements
 
-This project was proudly **vibe-coded** and AI-assisted, using advanced agentic tools to rapidly prototype, build, and deploy the entire hardware-emulation stack from scratch.
+This project was proudly **AI-assisted**, using advanced agentic tools to rapidly prototype, build, and deploy the entire hardware-emulation stack from scratch.
 
 NyxxPad utilizes the excellent **ViGEmBus** driver (Copyright © Nefarius Software Solutions e.U.) for Windows gamepad emulation. Please see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) for license details.
