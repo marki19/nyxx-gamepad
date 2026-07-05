@@ -10,6 +10,7 @@ using QRCoder;
 using System.Linq;
 using System.IO.Pipes;
 using System.Threading.Tasks;
+using System.Reflection;
 
 namespace NativeGamepadServer
 {

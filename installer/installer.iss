@@ -1,6 +1,6 @@
 [Setup]
 AppName=Nyxx Gamepad Server
-AppVersion=1.0
+AppVersion=0.1.0
 DefaultDirName={autopf}\NyxxGamepad
 DefaultGroupName=Nyxx Gamepad
 OutputDir=..\builds
