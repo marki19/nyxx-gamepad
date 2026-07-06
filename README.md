@@ -36,7 +36,7 @@ NyxxPad requires two components to work: the Windows Server and the Android App.
 
 ### 2. Android App Setup
 
-1. Go to the [Releases](../../releases/latest) page on your Android phone and download `app-release.apk`.
+1. Go to the [Releases](../../releases/latest) page on your Android phone and download `Nyxx.apk`.
 2. Open the file to install the app (you may need to allow "Install from unknown sources" in your Android settings).
 3. Open the NyxxPad app, choose your connection method (Wi-Fi, USB, or Bluetooth).
 4. Scan the QR code shown on the PC server, or enter the IP/Port manually, to connect.
