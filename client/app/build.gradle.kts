@@ -20,8 +20,8 @@ android {
         applicationId = "com.nativegamepad"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0"
     }
 
     buildFeatures {
@@ -29,7 +29,7 @@ android {
     }
 
     signingConfigs {
-        create("release") {
+        create("release") {                                                                                                                                                                                                                                                                     
             storeFile = file("release.keystore")
             storePassword = localProperties.getProperty("KEYSTORE_PASSWORD") ?: ""
             keyAlias = localProperties.getProperty("KEYSTORE_ALIAS") ?: "nyxxpad"
