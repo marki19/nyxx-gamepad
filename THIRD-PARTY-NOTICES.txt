@@ -1,4 +1,4 @@
-NyxxPad uses the following third-party software:
+Nyxx uses the following third-party software:
 
 --------------------------------------------------------------------------------
 ViGEmBus

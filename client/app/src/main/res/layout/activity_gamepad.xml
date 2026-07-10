@@ -15,6 +15,19 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <!-- Floating Hamburger Menu Button -->
+        <ImageButton
+            android:id="@+id/btnOpenMenu"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="16dp"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#8A2BE2"
+            android:elevation="4dp" />
+
         <!-- Floating Draggable Editor Panel -->
         <LinearLayout
             android:id="@+id/panelEditProperties"
@@ -101,9 +114,9 @@
                     android:layout_weight="1"
                     android:orientation="vertical"
                     android:paddingStart="16dp">
-                    <Switch android:id="@+id/switchVisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Visible" android:textColor="#EDEEF0" />
-                    <Switch android:id="@+id/switchTurbo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Turbo" android:textColor="#EDEEF0" />
-                    <Switch android:id="@+id/switchAnalog" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Analog" android:textColor="#EDEEF0" android:visibility="gone" />
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchVisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Visible" android:textColor="#EDEEF0" />
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchTurbo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Turbo" android:textColor="#EDEEF0" />
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchAnalog" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Analog" android:textColor="#EDEEF0" android:visibility="gone" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -191,11 +204,19 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp" />
 
-        <Switch
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switchGyro"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="GYRO STEERING"
+            android:textColor="#EDEEF0"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switchDanceMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="DANCE MODE (6-DoF)"
             android:textColor="#EDEEF0"
             android:layout_marginBottom="8dp" />
 
@@ -222,17 +243,17 @@
         </LinearLayout>
             
         <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnCalibrateGyro"
+            android:id="@+id/btnCalibrateSensors"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="CALIBRATE GYRO"
+            android:text="CALIBRATE SENSORS"
             android:background="@drawable/btn_outline"
             android:textColor="#45A29E"
             android:textStyle="bold"
             android:visibility="gone"
             android:layout_marginBottom="16dp" />
 
-        <Switch
+        <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switchRumble"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

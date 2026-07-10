@@ -14,7 +14,7 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
-        android:label="NyxxPad"
+        android:label="Nyxx"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">
         
@@ -32,14 +32,21 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="nyxxpad" android:host="connect" />
+                <data android:scheme="Nyxx" android:host="connect" />
             </intent-filter>
         </activity>
         
         <activity
             android:name=".MainActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.AppCompat.NoActionBar">
+        </activity>
+
+        <activity
+            android:name=".FaqActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar">
         </activity>
     </application>

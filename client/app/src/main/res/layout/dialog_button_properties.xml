@@ -65,7 +65,7 @@
         android:progress="100"
         android:layout_marginBottom="16dp" />
 
-    <Switch
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switchVisible"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -73,7 +73,7 @@
         android:textColor="#EDEEF0"
         android:layout_marginBottom="16dp" />
 
-    <Switch
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switchTurbo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -81,7 +81,7 @@
         android:textColor="#EDEEF0"
         android:layout_marginBottom="16dp" />
         
-    <Switch
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switchAnalog"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

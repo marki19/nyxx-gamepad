@@ -7,7 +7,10 @@ import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.content.edit
 import kotlin.math.hypot
+import kotlin.math.min
+
 
 object GamepadColors {
     val neutralBase = Color.parseColor("#1C1F24")
@@ -35,6 +38,7 @@ data class ButtonSpec(
 data class GamepadProfile(
     val id: String,
     val displayName: String,
+    val hasLeftStick: Boolean = true,
     val hasSecondStick: Boolean,
     val hasTriggers: Boolean,
     val buttons: List<ButtonSpec>
@@ -43,7 +47,7 @@ data class GamepadProfile(
 object GamepadProfiles {
     val NINTENDO = GamepadProfile(
         id = "nintendo",
-        displayName = "Nintendo",
+        displayName = "Nintendo Switch",
         hasSecondStick = true,
         hasTriggers = true,
         buttons = listOf(
@@ -61,7 +65,9 @@ object GamepadProfiles {
             ButtonSpec("ZR", 0, "R2", isTrigger = true, isL2 = false),
             ButtonSpec("-", 0x0020, "Sel"),
             ButtonSpec("+", 0x0010, "St"),
-            ButtonSpec("Home", 0x0400, "Home")
+            ButtonSpec("Home", 0x0400, "Home"),
+            ButtonSpec("SL", 0x0040, "SL"),
+            ButtonSpec("SR", 0x0080, "SR")
         )
     )
     val XBOX = GamepadProfile(
@@ -105,6 +111,59 @@ object GamepadProfiles {
             ButtonSpec("R1", 0x0200, "R1"),
             ButtonSpec("Sel", 0x0020, "Sel"),
             ButtonSpec("St", 0x0010, "St"),
+            ButtonSpec("Home", 0x0400, "Home")
+        )
+    )
+    val JOYCON_L = GamepadProfile(
+        id = "joycon_l",
+        displayName = "Joy-Con (Left)",
+        hasLeftStick = true,
+        hasSecondStick = false,
+        hasTriggers = true,
+        buttons = listOf(
+            ButtonSpec("U", 0x0001, "DPad", isDpad = true),
+            ButtonSpec("D", 0x0002, "DPad", isDpad = true),
+            ButtonSpec("L", 0x0004, "DPad", isDpad = true),
+            ButtonSpec("R", 0x0008, "DPad", isDpad = true),
+            ButtonSpec("L", 0x0100, "L1"),
+            ButtonSpec("ZL", 0, "L2", isTrigger = true, isL2 = true),
+            ButtonSpec("-", 0x0020, "Sel")
+        )
+    )
+    val JOYCON_R = GamepadProfile(
+        id = "joycon_r",
+        displayName = "Joy-Con (Right)",
+        hasLeftStick = false,
+        hasSecondStick = true,
+        hasTriggers = true,
+        buttons = listOf(
+            ButtonSpec("A", 0x2000, "ABXY"),
+            ButtonSpec("B", 0x1000, "ABXY"),
+            ButtonSpec("X", 0x8000, "ABXY"),
+            ButtonSpec("Y", 0x4000, "ABXY"),
+            ButtonSpec("R", 0x0200, "R1"),
+            ButtonSpec("ZR", 0, "R2", isTrigger = true, isL2 = false),
+            ButtonSpec("+", 0x0010, "St"),
+            ButtonSpec("Home", 0x0400, "Home")
+        )
+    )
+    val WII = GamepadProfile(
+        id = "wii",
+        displayName = "Wii Remote",
+        hasLeftStick = false,
+        hasSecondStick = false,
+        hasTriggers = false,
+        buttons = listOf(
+            ButtonSpec("A", 0x2000, "BtnA"), // Maps to Nintendo A (Xbox B)
+            ButtonSpec("B", 0x1000, "BtnB"), // Maps to Nintendo B (Xbox A)
+            ButtonSpec("1", 0, "Btn1", isTrigger = true, isL2 = true), // Maps to Nintendo ZL (Left Trigger)
+            ButtonSpec("2", 0, "Btn2", isTrigger = true, isL2 = false), // Maps to Nintendo ZR (Right Trigger)
+            ButtonSpec("U", 0x0001, "DPad", isDpad = true),
+            ButtonSpec("D", 0x0002, "DPad", isDpad = true),
+            ButtonSpec("L", 0x0004, "DPad", isDpad = true),
+            ButtonSpec("R", 0x0008, "DPad", isDpad = true),
+            ButtonSpec("-", 0x0020, "Sel"),
+            ButtonSpec("+", 0x0010, "St"),
             ButtonSpec("Home", 0x0400, "Home")
         )
     )
@@ -177,7 +236,7 @@ class GamepadView @JvmOverloads constructor(
     private val prefs = context.getSharedPreferences("GamepadPrefs", Context.MODE_PRIVATE)
     var showTelemetry = prefs.getBoolean("showTelemetry", false)
 
-    private var isEditMode = false
+    var isEditMode = false
     private var draggingGroup: String? = null
     private var dragStartX = 0f
     private var dragStartY = 0f
@@ -188,7 +247,12 @@ class GamepadView @JvmOverloads constructor(
 
     private val groupOffsets = mutableMapOf<String, PointF>()
     private val originalGroupOffsets = mutableMapOf<String, PointF>()
-    private val groupNames = listOf("LeftJoy", "RightJoy", "DPad", "ABXY", "L1", "L2", "R1", "R2", "Sel", "St", "Home")
+    private val groupNames = listOf(
+        "LeftJoy", "RightJoy", "DPad", "ABXY",
+        "L1", "L2", "R1", "R2", "SL", "SR",
+        "Sel", "St", "Home",
+        "BtnA", "BtnB", "Btn1", "Btn2"
+    )
 
     class Joystick(var group: String, var cx: Float = 0f, var cy: Float = 0f, var baseRadius: Float = 0f) {
         var radius = 0f
@@ -325,12 +389,119 @@ class GamepadView @JvmOverloads constructor(
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
 
-        val baseRadius = h * 0.10f
-        val joyR = h * 0.20f
-        val baseSpacing = h * 0.15f
+        val baseRadius = Math.min(w, h) * 0.10f
+        val joyR = Math.min(w, h) * 0.20f
+        val baseSpacing = Math.min(w, h) * 0.15f
         
         var conf: ButtonConfig
         var off: PointF
+
+        if (currentProfile.id == "wii") {
+            // DPad
+            val dpadCx = w * 0.5f + getOffset("DPad").x
+            val dpadCy = h * 0.18f + getOffset("DPad").y
+            val dSpacing = baseSpacing * 0.8f * getConfig("DPad").spacing
+            val dpadBtnR = baseRadius * 0.8f * getConfig("DPad").scale
+            buttons.find { it.name == "U" && it.group == "DPad" }?.apply { cx = dpadCx; cy = dpadCy - dSpacing; radius = dpadBtnR }
+            buttons.find { it.name == "D" && it.group == "DPad" }?.apply { cx = dpadCx; cy = dpadCy + dSpacing; radius = dpadBtnR }
+            buttons.find { it.name == "L" && it.group == "DPad" }?.apply { cx = dpadCx - dSpacing; cy = dpadCy; radius = dpadBtnR }
+            buttons.find { it.name == "R" && it.group == "DPad" }?.apply { cx = dpadCx + dSpacing; cy = dpadCy; radius = dpadBtnR }
+
+            // A, B, 1, 2 (independent groups)
+            val cW = w * 0.5f
+            buttons.find { it.name == "A" && it.group == "BtnA" }?.apply { cx = cW + getOffset("BtnA").x; cy = h * 0.35f + getOffset("BtnA").y; radius = baseRadius * 1.2f * getConfig("BtnA").scale }
+            buttons.find { it.name == "B" && it.group == "BtnB" }?.apply { cx = cW + getOffset("BtnB").x; cy = h * 0.06f + getOffset("BtnB").y; radius = baseRadius * 1.5f * getConfig("BtnB").scale } // Large trigger at top
+            buttons.find { it.name == "1" && it.group == "Btn1" }?.apply { cx = cW + getOffset("Btn1").x; cy = h * 0.80f + getOffset("Btn1").y; radius = baseRadius * 0.8f * getConfig("Btn1").scale }
+            buttons.find { it.name == "2" && it.group == "Btn2" }?.apply { cx = cW + getOffset("Btn2").x; cy = h * 0.92f + getOffset("Btn2").y; radius = baseRadius * 0.8f * getConfig("Btn2").scale }
+
+            // Center buttons
+            val cCx = w * 0.5f
+            val cCy = h * 0.50f
+            val cSpacing = w * 0.20f
+            buttons.find { it.name == "-" && it.group == "Sel" }?.apply { cx = cCx - cSpacing + getOffset("Sel").x; cy = cCy + getOffset("Sel").y; radius = baseRadius * 0.5f * getConfig("Sel").scale }
+            buttons.find { it.name == "Home" && it.group == "Home" }?.apply { cx = cCx + getOffset("Home").x; cy = cCy + getOffset("Home").y; radius = baseRadius * 0.45f * getConfig("Home").scale }
+            buttons.find { it.name == "+" && it.group == "St" }?.apply { cx = cCx + cSpacing + getOffset("St").x; cy = cCy + getOffset("St").y; radius = baseRadius * 0.5f * getConfig("St").scale }
+
+            return
+        }
+
+        if (currentProfile.id == "joycon_l" || currentProfile.id == "joycon_r") {
+            val isLeft = currentProfile.id == "joycon_l"
+            val cw = w * 0.5f
+
+            // Top triggers (Wii-style vertical stack)
+            val topTriggerY = h * 0.08f
+            val topBumperY = h * 0.18f
+            if (isLeft) {
+                conf = getConfig("L2"); off = getOffset("L2")
+                buttons.find { it.group == "L2" }?.apply { cx = cw + off.x; cy = topTriggerY + off.y; radius = baseRadius * 1.4f * conf.scale }
+                
+                conf = getConfig("L1"); off = getOffset("L1")
+                buttons.find { it.group == "L1" }?.apply { cx = cw + off.x; cy = topBumperY + off.y; radius = baseRadius * 0.8f * conf.scale }
+            } else {
+                conf = getConfig("R2"); off = getOffset("R2")
+                buttons.find { it.group == "R2" }?.apply { cx = cw + off.x; cy = topTriggerY + off.y; radius = baseRadius * 1.4f * conf.scale }
+                
+                conf = getConfig("R1"); off = getOffset("R1")
+                buttons.find { it.group == "R1" }?.apply { cx = cw + off.x; cy = topBumperY + off.y; radius = baseRadius * 0.8f * conf.scale }
+            }
+
+            // Main button area (middle)
+            val mainY = h * 0.38f
+            val mainSpacing = w * 0.18f
+            if (isLeft) {
+                // D-Pad
+                val dpadCx = cw
+                val dSpacing = baseSpacing * 0.9f * getConfig("DPad").spacing
+                val dpadBtnR = baseRadius * 0.85f * getConfig("DPad").scale
+                buttons.find { it.name == "U" && it.group == "DPad" }?.apply { cx = dpadCx + getOffset("DPad").x; cy = mainY - dSpacing + getOffset("DPad").y; radius = dpadBtnR }
+                buttons.find { it.name == "D" && it.group == "DPad" }?.apply { cx = dpadCx + getOffset("DPad").x; cy = mainY + dSpacing + getOffset("DPad").y; radius = dpadBtnR }
+                buttons.find { it.name == "L" && it.group == "DPad" }?.apply { cx = dpadCx - dSpacing + getOffset("DPad").x; cy = mainY + getOffset("DPad").y; radius = dpadBtnR }
+                buttons.find { it.name == "R" && it.group == "DPad" }?.apply { cx = dpadCx + dSpacing + getOffset("DPad").x; cy = mainY + getOffset("DPad").y; radius = dpadBtnR }
+
+                // Minus button
+                conf = getConfig("Sel"); off = getOffset("Sel")
+                buttons.find { it.name == "-" && it.group == "Sel" }?.apply { cx = cw - mainSpacing + off.x; cy = h * 0.52f + off.y; radius = baseRadius * 0.6f * conf.scale }
+            } else {
+                // ABXY cluster
+                val abxyCx = cw
+                val aSpacing = baseSpacing * getConfig("ABXY").spacing
+                val aBtnR = baseRadius * getConfig("ABXY").scale
+                buttons.find { it.name == "A" && it.group == "ABXY" }?.apply { cx = abxyCx + aSpacing + getOffset("ABXY").x; cy = mainY + getOffset("ABXY").y; radius = aBtnR }
+                buttons.find { it.name == "B" && it.group == "ABXY" }?.apply { cx = abxyCx + getOffset("ABXY").x; cy = mainY + aSpacing + getOffset("ABXY").y; radius = aBtnR }
+                buttons.find { it.name == "X" && it.group == "ABXY" }?.apply { cx = abxyCx + getOffset("ABXY").x; cy = mainY - aSpacing + getOffset("ABXY").y; radius = aBtnR }
+                buttons.find { it.name == "Y" && it.group == "ABXY" }?.apply { cx = abxyCx - aSpacing + getOffset("ABXY").x; cy = mainY + getOffset("ABXY").y; radius = aBtnR }
+
+                // Plus and Home buttons
+                conf = getConfig("St"); off = getOffset("St")
+                buttons.find { it.name == "+" && it.group == "St" }?.apply { cx = cw - mainSpacing + off.x; cy = h * 0.52f + off.y; radius = baseRadius * 0.6f * conf.scale }
+
+                conf = getConfig("Home"); off = getOffset("Home")
+                buttons.find { it.name == "Home" && it.group == "Home" }?.apply { cx = cw + mainSpacing + off.x; cy = h * 0.52f + off.y; radius = baseRadius * 0.6f * conf.scale }
+            }
+
+            // Joystick (bottom center)
+            if (isLeft) {
+                conf = getConfig("LeftJoy"); off = getOffset("LeftJoy")
+                leftJoy.cx = cw + off.x
+                leftJoy.cy = h * 0.75f + off.y
+                leftJoy.baseRadius = joyR * 0.9f
+                leftJoy.radius = joyR * 0.9f * conf.scale
+                leftJoy.knobX = leftJoy.cx
+                leftJoy.knobY = leftJoy.cy
+            } else {
+                conf = getConfig("RightJoy"); off = getOffset("RightJoy")
+                rightJoy.cx = cw + off.x
+                rightJoy.cy = h * 0.75f + off.y
+                rightJoy.baseRadius = joyR * 0.9f
+                rightJoy.radius = joyR * 0.9f * conf.scale
+                rightJoy.knobX = rightJoy.cx
+                rightJoy.knobY = rightJoy.cy
+            }
+
+            invalidate()
+            return
+        }
 
         // L2
         conf = getConfig("L2"); off = getOffset("L2")
@@ -339,11 +510,19 @@ class GamepadView @JvmOverloads constructor(
         // L1
         conf = getConfig("L1"); off = getOffset("L1")
         buttons.find { it.group == "L1" }?.apply { cx = safeInsetLeft + w * 0.30f + off.x; cy = h * 0.15f + off.y; radius = baseRadius * 0.9f * conf.scale }
-        
+
+        // SL (Joy-Con side button)
+        conf = getConfig("SL"); off = getOffset("SL")
+        buttons.find { it.name == "SL" && it.group == "SL" }?.apply { cx = safeInsetLeft + w * 0.25f + off.x; cy = h * 0.22f + off.y; radius = baseRadius * 0.6f * conf.scale }
+
         // R1
         conf = getConfig("R1"); off = getOffset("R1")
         buttons.find { it.group == "R1" }?.apply { cx = safeInsetLeft + w * 0.70f + off.x; cy = h * 0.15f + off.y; radius = baseRadius * 0.9f * conf.scale }
-        
+
+        // SR (Joy-Con side button)
+        conf = getConfig("SR"); off = getOffset("SR")
+        buttons.find { it.name == "SR" && it.group == "SR" }?.apply { cx = safeInsetLeft + w * 0.75f + off.x; cy = h * 0.22f + off.y; radius = baseRadius * 0.6f * conf.scale }
+
         // R2
         conf = getConfig("R2"); off = getOffset("R2")
         buttons.find { it.group == "R2" }?.apply { cx = safeInsetLeft + w * 0.85f + off.x; cy = h * 0.15f + off.y; radius = baseRadius * 0.9f * conf.scale }
@@ -422,21 +601,21 @@ class GamepadView @JvmOverloads constructor(
     }
 
     fun saveConfigState() {
-        val editor = prefs.edit()
         val pid = currentProfile.id
-        for ((group, pt) in groupOffsets) {
-            editor.putFloat("offX_${pid}_$group", pt.x)
-            editor.putFloat("offY_${pid}_$group", pt.y)
+        prefs.edit {
+            for ((group, pt) in groupOffsets) {
+                putFloat("offX_${pid}_$group", pt.x)
+                putFloat("offY_${pid}_$group", pt.y)
+            }
+            for ((group, config) in buttonConfigs) {
+                putFloat("scale_${pid}_$group", config.scale)
+                putFloat("spacing_${pid}_$group", config.spacing)
+                putFloat("opacity_${pid}_$group", config.opacity)
+                putBoolean("visible_${pid}_$group", config.visible)
+                putBoolean("turbo_${pid}_$group", config.turbo)
+                putBoolean("analog_${pid}_$group", config.analogTrigger)
+            }
         }
-        for ((group, config) in buttonConfigs) {
-            editor.putFloat("scale_${pid}_$group", config.scale)
-            editor.putFloat("spacing_${pid}_$group", config.spacing)
-            editor.putFloat("opacity_${pid}_$group", config.opacity)
-            editor.putBoolean("visible_${pid}_$group", config.visible)
-            editor.putBoolean("turbo_${pid}_$group", config.turbo)
-            editor.putBoolean("analog_${pid}_$group", config.analogTrigger)
-        }
-        editor.apply()
     }
 
     fun resetLayoutDefaults() {
@@ -445,26 +624,26 @@ class GamepadView @JvmOverloads constructor(
             groupOffsets[g] = PointF(0f, 0f)
             buttonConfigs[g] = ButtonConfig()
         }
-        val editor = prefs.edit()
         val pid = currentProfile.id
-        for (g in groupNames) {
-            editor.remove("offX_${pid}_$g")
-            editor.remove("offY_${pid}_$g")
-            editor.remove("scale_${pid}_$g")
-            editor.remove("spacing_${pid}_$g")
-            editor.remove("opacity_${pid}_$g")
-            editor.remove("visible_${pid}_$g")
-            editor.remove("turbo_${pid}_$g")
-            editor.remove("analog_${pid}_$g")
+        prefs.edit {
+            for (g in groupNames) {
+                remove("offX_${pid}_$g")
+                remove("offY_${pid}_$g")
+                remove("scale_${pid}_$g")
+                remove("spacing_${pid}_$g")
+                remove("opacity_${pid}_$g")
+                remove("visible_${pid}_$g")
+                remove("turbo_${pid}_$g")
+                remove("analog_${pid}_$g")
+            }
         }
-        editor.apply()
         applyScales()
         invalidate()
     }
 
     fun toggleTelemetry() {
         showTelemetry = !showTelemetry
-        prefs.edit().putBoolean("showTelemetry", showTelemetry).apply()
+        prefs.edit { putBoolean("showTelemetry", showTelemetry) }
         invalidate()
     }
 
@@ -503,6 +682,11 @@ class GamepadView @JvmOverloads constructor(
         applyScales()
     }
 
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val action = event.actionMasked
         val pointerIndex = event.actionIndex
@@ -510,13 +694,20 @@ class GamepadView @JvmOverloads constructor(
         val x = event.getX(pointerIndex)
         val y = event.getY(pointerIndex)
 
+        if (action == MotionEvent.ACTION_UP) {
+            performClick()
+        }
+
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             if (!isEditMode) {
-                val cx = width / 2f
-                val cy = height * 0.1f
-                val r = Math.min(width, height) * 0.05f
-                if (Math.hypot((x - cx).toDouble(), (y - cy).toDouble()) < r * 1.5f) {
+                val isTopRightPause = currentProfile.id == "wii" || currentProfile.id.startsWith("joycon")
+                val cx = if (isTopRightPause) width * 0.85f else width / 2f
+                val cy = if (isTopRightPause) height * 0.06f else height * 0.1f
+                val r = min(width, height) * 0.05f
+                if (hypot((x - cx).toDouble(), (y - cy).toDouble()) < r * 1.5f) {
                     isInputPaused = !isInputPaused
+                    udpSender?.isPaused = isInputPaused
+                    bluetoothSender?.isPaused = isInputPaused
                     updateButtonState()
                     invalidate()
                     return true
@@ -546,7 +737,7 @@ class GamepadView @JvmOverloads constructor(
             val pX = event.getX(i)
             val pY = event.getY(i)
 
-            if (pId == leftJoy.pointerId || (leftJoy.pointerId == -1 && leftJoy.contains(pX, pY) && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN))) {
+            if (currentProfile.hasLeftStick && (pId == leftJoy.pointerId || (leftJoy.pointerId == -1 && leftJoy.contains(pX, pY) && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)))) {
                 leftJoy.pointerId = pId
                 updateJoystick(leftJoy, pX, pY, isLeft = true)
                 isLeftJoyActive = true
@@ -600,7 +791,7 @@ class GamepadView @JvmOverloads constructor(
                 if (draggingGroup == null) {
                     didDrag = false
                     var targetGroup: String? = null
-                    if (currentProfile.hasSecondStick && leftJoy.contains(x, y)) targetGroup = leftJoy.group
+                    if (currentProfile.hasLeftStick && leftJoy.contains(x, y)) targetGroup = leftJoy.group
                     else if (currentProfile.hasSecondStick && rightJoy.contains(x, y)) targetGroup = rightJoy.group
                     else {
                         for (btn in buttons) {
@@ -634,6 +825,7 @@ class GamepadView @JvmOverloads constructor(
                             didDrag = true
                             groupOffsets[group] = PointF(dragInitialOffsetX + dx, dragInitialOffsetY + dy)
                             applyScales()
+                            invalidate()
                         }
                     }
                 }
@@ -642,6 +834,8 @@ class GamepadView @JvmOverloads constructor(
                 if (pointerId == dragPointerId) {
                     if (!didDrag && draggingGroup != null) {
                         onButtonEditRequested?.invoke(draggingGroup!!)
+                    } else if (didDrag) {
+                        saveConfigState()
                     }
                     draggingGroup = null
                     dragPointerId = -1
@@ -680,6 +874,10 @@ class GamepadView @JvmOverloads constructor(
                 state.ly = (outY * 32767).toInt().toShort()
             } else {
                 state.rx = (outX * 32767).toInt().toShort(); state.ry = (outY * 32767).toInt().toShort()
+                if (currentProfile.id == "joycon_r") {
+                    if (!isGyroEnabled) state.lx = state.rx
+                    state.ly = state.ry
+                }
             }
         } else {
             if (isLeft) {
@@ -687,6 +885,10 @@ class GamepadView @JvmOverloads constructor(
                 state.ly = 0
             } else {
                 state.rx = 0; state.ry = 0
+                if (currentProfile.id == "joycon_r") {
+                    if (!isGyroEnabled) state.lx = 0
+                    state.ly = 0
+                }
             }
         }
         invalidate()
@@ -702,18 +904,25 @@ class GamepadView @JvmOverloads constructor(
                     if (config.turbo && !turboState) continue
                     if (btn.isTrigger) {
                         if (btn.isL2) lt = btn.analogValue else rt = btn.analogValue
-                    } else if (!btn.isOverlayUI) {
+                    } else if (!btn.isOverlayUI && btn.group !in listOf("SL", "SR")) {
                         mask = mask or btn.bit
                     }
                 }
+            }
+            if (currentProfile.id.startsWith("joycon")) {
+                if (state.ly > 16000) mask = mask or 0x0001 // Up
+                if (state.ly < -16000) mask = mask or 0x0002 // Down
+                if (state.lx < -16000) mask = mask or 0x0004 // Left
+                if (state.lx > 16000) mask = mask or 0x0008 // Right
             }
         }
         state.buttons = mask; state.lt = lt; state.rt = rt
     }
 
     private fun drawPauseToggle(canvas: Canvas) {
-        val cx = width / 2f
-        val cy = height * 0.1f
+        val isTopRightPause = currentProfile.id == "wii" || currentProfile.id.startsWith("joycon")
+        val cx = if (isTopRightPause) width * 0.85f else width / 2f
+        val cy = if (isTopRightPause) height * 0.06f else height * 0.1f
         val r = Math.min(width, height) * 0.05f
         paint.color = if (isInputPaused) Color.parseColor("#FF5C5C") else GamepadColors.neutralBase
         paint.style = Paint.Style.FILL; paint.alpha = 200; canvas.drawCircle(cx, cy, r, paint)
@@ -792,7 +1001,7 @@ class GamepadView @JvmOverloads constructor(
             var i = 0f; while (i < w) { canvas.drawLine(i, 0f, i, h, gridPaint); i += gridSize }
             var j = 0f; while (j < h) { canvas.drawLine(0f, j, w, j, gridPaint); j += gridSize }
         }
-        if (getConfig("LeftJoy").visible || isEditMode) drawJoystick(canvas, leftJoy, getConfig("LeftJoy"))
+        if (currentProfile.hasLeftStick && (getConfig("LeftJoy").visible || isEditMode)) drawJoystick(canvas, leftJoy, getConfig("LeftJoy"))
         if (currentProfile.hasSecondStick && (getConfig("RightJoy").visible || isEditMode)) drawJoystick(canvas, rightJoy, getConfig("RightJoy"))
         
         for (btn in buttons) {
@@ -1038,7 +1247,7 @@ class GamepadView @JvmOverloads constructor(
             paint.style = Paint.Style.FILL
         }
 
-        val isActive = joy.knobX != joy.cx || joy.knobY != joy.cy && !isEditMode
+        val isActive = (joy.knobX != joy.cx || joy.knobY != joy.cy) && !isEditMode
         val alphaInt = (config.opacity * 255).toInt()
 
         paint.color = GamepadColors.neutralBase

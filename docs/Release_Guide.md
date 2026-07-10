@@ -16,7 +16,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 **Output:**
 The compiled file will be located at:
-`server/bin/Release/net8.0-windows/win-x64/publish/NyxxPadServer.exe`
+`server/bin/Release/net8.0-windows/win-x64/publish/NyxxServer.exe`
 
 *(Note: We have already run this for you, and the latest version is currently sitting in your root `builds/` directory!)*
 
@@ -48,12 +48,12 @@ To generate this file for the first time:
 4. Under "Key store path", click **Create new...**
 5. Save the file exactly as `release.keystore` inside your `client/app/` folder.
 6. Set a strong password for both the store and the key.
-7. Set the Alias to `nyxxpad`.
+7. Set the Alias to `Nyxx`.
 8. Fill out at least one certificate field and click OK.
 9. Open `client/local.properties` (create it if it doesn't exist) and add the following lines with your newly chosen password:
    ```properties
    KEYSTORE_PASSWORD=YourChosenPasswordHere
-   KEYSTORE_ALIAS=nyxxpad
+   KEYSTORE_ALIAS=Nyxx
    ```
 
 Once that file is created and the password is set in `local.properties`, you can easily build highly optimized release versions anytime:
@@ -72,5 +72,5 @@ The compiled file will be located at:
 
 1. Go to your GitHub repository and click **Releases > Draft a new release**.
 2. Create a new tag (e.g., `v1.0.0`).
-3. Drag and drop both `NyxxPadServer.exe` and `app-debug.apk` into the "Attach binaries" box.
+3. Drag and drop both `NyxxServer.exe` and `app-debug.apk` into the "Attach binaries" box.
 4. Publish the release!

@@ -14,12 +14,12 @@ import java.util.concurrent.Executors
 
 @SuppressLint("MissingPermission")
 class BluetoothHidSender(private val context: Context) {
-    lateinit var isRumbleEnabled: Any
     private var hidDevice: BluetoothHidDevice? = null
     var connectedDevice: BluetoothDevice? = null
         private set
     private var isRegistered = false
     private var isRunning = false
+    var isPaused = false
     private var thread: Thread? = null
 
     val state = ControllerState()
@@ -108,7 +108,7 @@ class BluetoothHidSender(private val context: Context) {
             while (isRunning) {
                 val now = System.currentTimeMillis()
                 val stateChanged = !state.equalsExceptSeq(lastSentState)
-                val heartbeatDue = (now - lastSendTime) > 300 
+                val heartbeatDue = (now - lastSendTime) > 300 && !isPaused
 
                 if (stateChanged || heartbeatDue) {
                     sendReport()
@@ -117,7 +117,7 @@ class BluetoothHidSender(private val context: Context) {
                 }
                 try {
                     Thread.sleep(16)
-                } catch (e: InterruptedException) {
+                } catch (_: InterruptedException) {
                     break
                 }
             }

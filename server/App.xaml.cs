@@ -14,32 +14,42 @@ namespace NativeGamepadServer
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            bool createdNew;
-            _mutex = new Mutex(true, AppMutexName, out createdNew);
+            bool isDevMode = false;
+#if DEBUG
+            foreach (var arg in e.Args) {
+                if (arg.ToLower() == "--dev") isDevMode = true;
+            }
+#endif
 
-            if (!createdNew)
+            if (!isDevMode)
             {
-                // App is already running. Send a wakeup signal via IPC.
-                try
+                bool createdNew;
+                _mutex = new Mutex(true, AppMutexName, out createdNew);
+
+                if (!createdNew)
                 {
-                    using (var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out))
+                    // App is already running. Send a wakeup signal via IPC.
+                    try
                     {
-                        // 1 second timeout so it doesn't hang if the first instance is deadlocked
-                        client.Connect(1000);
-                        using (var writer = new StreamWriter(client))
+                        using (var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out))
                         {
-                            writer.WriteLine("WAKE_UP");
-                            writer.Flush();
+                            // 1 second timeout so it doesn't hang if the first instance is deadlocked
+                            client.Connect(1000);
+                            using (var writer = new StreamWriter(client))
+                            {
+                                writer.WriteLine("WAKE_UP");
+                                writer.Flush();
+                            }
                         }
                     }
-                }
-                catch (Exception)
-                {
-                    // Ignore IPC failures if the first instance isn't listening for some reason
-                }
+                    catch (Exception)
+                    {
+                        // Ignore IPC failures if the first instance isn't listening for some reason
+                    }
 
-                System.Windows.Application.Current.Shutdown();
-                return;
+                    System.Windows.Application.Current.Shutdown();
+                    return;
+                }
             }
 
             base.OnStartup(e);

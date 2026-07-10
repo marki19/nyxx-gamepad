@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -31,7 +32,7 @@ namespace NativeGamepadServer
             SetupNotifyIcon();
             StartIpcServer();
             _ = CheckForUpdatesAsync();
-            AppendLog("Nexus Server UI Initialized. Ready to start.");
+            AppendLog("Nyxx Server UI Initialized. Ready to start.");
             UpdateQrCode();
         }
 
@@ -41,7 +42,7 @@ namespace NativeGamepadServer
             {
                 using (var client = new System.Net.Http.HttpClient())
                 {
-                    client.DefaultRequestHeaders.Add("User-Agent", "NyxxPadServer-Updater");
+                    client.DefaultRequestHeaders.Add("User-Agent", "NyxxServer-Updater");
                     
                     string repoOwner = "marki19"; 
                     string repoName = "nyxx-gamepad";
@@ -66,7 +67,7 @@ namespace NativeGamepadServer
                                 Dispatcher.Invoke(() =>
                                 {
                                     var result = System.Windows.MessageBox.Show(
-                                        $"A new version of NyxxPad Server ({tagName}) is available!\n\nWould you like to download it now?",
+                                        $"A new version of Nyxx Server ({tagName}) is available!\n\nWould you like to download it now?",
                                         "Update Available",
                                         System.Windows.MessageBoxButton.YesNo,
                                         System.Windows.MessageBoxImage.Information);
@@ -97,7 +98,7 @@ namespace NativeGamepadServer
             string port = txtPort.Text;
             txtIp.Text = $"IP: {ip}";
             
-            string qrData = $"nyxxpad://connect?ip={ip}&port={port}";
+            string qrData = $"Nyxx://connect?ip={ip}&port={port}";
             using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
             using (QRCodeData qrCodeData = qrGenerator.CreateQrCode(qrData, QRCodeGenerator.ECCLevel.Q))
             using (QRCode qrCode = new QRCode(qrCodeData))
@@ -214,7 +215,7 @@ namespace NativeGamepadServer
             if (WindowState == WindowState.Minimized)
             {
                 Hide();
-                notifyIcon?.ShowBalloonTip(2000, "Nexus Server", "Server is running in the background.", System.Windows.Forms.ToolTipIcon.Info);
+                notifyIcon?.ShowBalloonTip(2000, "Nyxx Server", "Server is running in the background.", System.Windows.Forms.ToolTipIcon.Info);
             }
             else
             {
@@ -234,14 +235,15 @@ namespace NativeGamepadServer
                 btnToggle.Content = "START SERVER";
                 btnToggle.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8A2BE2"));
                 txtPort.IsEnabled = true;
+                txtDsuPort.IsEnabled = true;
                 ResetSlots();
                 AppendLog("Server stopped.");
             }
             else
             {
-                if (int.TryParse(txtPort.Text, out int port))
+                if (int.TryParse(txtPort.Text, out int port) && int.TryParse(txtDsuPort.Text, out int dsuPort))
                 {
-                    int activePort = server.Start(port);
+                    int activePort = server.Start(port, dsuPort);
                     if (server.IsRunning && activePort > 0)
                     {
                         txtPort.Text = activePort.ToString();
@@ -249,6 +251,12 @@ namespace NativeGamepadServer
                         btnToggle.Content = "STOP SERVER";
                         btnToggle.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF5C5C"));
                         txtPort.IsEnabled = false;
+                        txtDsuPort.IsEnabled = false;
+                        if (server.DsuRunning) {
+                            AppendLog($"DSU/Cemuhook available on ports {dsuPort} and {dsuPort + 1}");
+                        } else {
+                            AppendLog($"DSU/Cemuhook failed to start. Port {dsuPort} or {dsuPort + 1} may be in use.");
+                        }
                     }
                 }
                 else
@@ -259,13 +267,17 @@ namespace NativeGamepadServer
         }
 
         private void AppendLog(string message)
+{
+    Dispatcher.BeginInvoke(() =>
+    {
+        if (txtConsole.Text.Length > 10000)
         {
-            Dispatcher.Invoke(() =>
-            {
-                txtConsole.Text += $"[{DateTime.Now:HH:mm:ss}] {message}\n";
-                logScroll.ScrollToEnd();
-            });
+            txtConsole.Text = txtConsole.Text.Substring(5000);
         }
+        txtConsole.Text += $"[{DateTime.Now:HH:mm:ss}] {message}\n";
+        logScroll.ScrollToEnd();
+    });
+}
 
         private void Server_LogMessage(object? sender, LogMessageEventArgs e)
         {
@@ -288,8 +300,14 @@ namespace NativeGamepadServer
             });
         }
 
+        private long lastUiUpdateTicks = 0;
+
         private void Server_StateUpdated(object? sender, GamepadStateArgs e)
         {
+            long currentTicks = DateTime.UtcNow.Ticks;
+            if (currentTicks - lastUiUpdateTicks < 330000) return; // Rate limit to ~30 FPS (33ms) to prevent UI freezing
+            lastUiUpdateTicks = currentTicks;
+
             Dispatcher.InvokeAsync(() =>
             {
                 switch (e.PlayerIndex)
@@ -298,6 +316,10 @@ namespace NativeGamepadServer
                     case 2: UpdateTesterState(thumb2L, thumb2R, prog2L, prog2R, btn2Txt, e); break;
                     case 3: UpdateTesterState(thumb3L, thumb3R, prog3L, prog3R, btn3Txt, e); break;
                     case 4: UpdateTesterState(thumb4L, thumb4R, prog4L, prog4R, btn4Txt, e); break;
+                    case 5: UpdateTesterState(thumb5L, thumb5R, prog5L, prog5R, btn5Txt, e); break;
+                    case 6: UpdateTesterState(thumb6L, thumb6R, prog6L, prog6R, btn6Txt, e); break;
+                    case 7: UpdateTesterState(thumb7L, thumb7R, prog7L, prog7R, btn7Txt, e); break;
+                    case 8: UpdateTesterState(thumb8L, thumb8R, prog8L, prog8R, btn8Txt, e); break;
                 }
             });
         }
@@ -341,42 +363,28 @@ namespace NativeGamepadServer
             switch (index)
             {
                 case 1:
-                    slot1.BorderBrush = brush;
-                    lblP1.Foreground = brush;
-                    txtP1.Text = text;
-                    testerP1.Visibility = Visibility.Visible;
-                    testerP1.Opacity = connected ? 1.0 : 0.2;
-                    break;
+                    slot1.BorderBrush = brush; lblP1.Foreground = brush; txtP1.Text = text; testerP1.Visibility = Visibility.Visible; testerP1.Opacity = connected ? 1.0 : 0.2; break;
                 case 2:
-                    slot2.BorderBrush = brush;
-                    lblP2.Foreground = brush;
-                    txtP2.Text = text;
-                    testerP2.Visibility = Visibility.Visible;
-                    testerP2.Opacity = connected ? 1.0 : 0.2;
-                    break;
+                    slot2.BorderBrush = brush; lblP2.Foreground = brush; txtP2.Text = text; testerP2.Visibility = Visibility.Visible; testerP2.Opacity = connected ? 1.0 : 0.2; break;
                 case 3:
-                    slot3.BorderBrush = brush;
-                    lblP3.Foreground = brush;
-                    txtP3.Text = text;
-                    testerP3.Visibility = Visibility.Visible;
-                    testerP3.Opacity = connected ? 1.0 : 0.2;
-                    break;
+                    slot3.BorderBrush = brush; lblP3.Foreground = brush; txtP3.Text = text; testerP3.Visibility = Visibility.Visible; testerP3.Opacity = connected ? 1.0 : 0.2; break;
                 case 4:
-                    slot4.BorderBrush = brush;
-                    lblP4.Foreground = brush;
-                    txtP4.Text = text;
-                    testerP4.Visibility = Visibility.Visible;
-                    testerP4.Opacity = connected ? 1.0 : 0.2;
-                    break;
+                    slot4.BorderBrush = brush; lblP4.Foreground = brush; txtP4.Text = text; testerP4.Visibility = Visibility.Visible; testerP4.Opacity = connected ? 1.0 : 0.2; break;
+                case 5:
+                    slot5.BorderBrush = brush; lblP5.Foreground = brush; txtP5.Text = text; testerP5.Visibility = Visibility.Visible; testerP5.Opacity = connected ? 1.0 : 0.2; break;
+                case 6:
+                    slot6.BorderBrush = brush; lblP6.Foreground = brush; txtP6.Text = text; testerP6.Visibility = Visibility.Visible; testerP6.Opacity = connected ? 1.0 : 0.2; break;
+                case 7:
+                    slot7.BorderBrush = brush; lblP7.Foreground = brush; txtP7.Text = text; testerP7.Visibility = Visibility.Visible; testerP7.Opacity = connected ? 1.0 : 0.2; break;
+                case 8:
+                    slot8.BorderBrush = brush; lblP8.Foreground = brush; txtP8.Text = text; testerP8.Visibility = Visibility.Visible; testerP8.Opacity = connected ? 1.0 : 0.2; break;
             }
         }
 
         private void ResetSlots()
         {
-            UpdateSlot(1, false, "");
-            UpdateSlot(2, false, "");
-            UpdateSlot(3, false, "");
-            UpdateSlot(4, false, "");
+            UpdateSlot(1, false, ""); UpdateSlot(2, false, ""); UpdateSlot(3, false, ""); UpdateSlot(4, false, "");
+            UpdateSlot(5, false, ""); UpdateSlot(6, false, ""); UpdateSlot(7, false, ""); UpdateSlot(8, false, "");
         }
 
         protected override void OnClosed(EventArgs e)

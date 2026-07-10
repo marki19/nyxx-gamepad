@@ -19,7 +19,15 @@ data class ControllerState(
     var rx: Short = 0,
     var ry: Short = 0,
     var lt: Byte = 0,
-    var rt: Byte = 0
+    var rt: Byte = 0,
+    var accelX: Float = 0f,
+    var accelY: Float = 0f,
+    var accelZ: Float = 0f,
+    var gyroX: Float = 0f,
+    var gyroY: Float = 0f,
+    var gyroZ: Float = 0f,
+    var joyconType: Byte = 0, // 0=Right, 1=Left, 2=Pro (matches server JoyConType)
+    var battery: Byte = 4     // 0-4 scale, 4=Full
 ) {
     fun copyFrom(other: ControllerState) {
         this.seq = other.seq
@@ -30,13 +38,24 @@ data class ControllerState(
         this.ry = other.ry
         this.lt = other.lt
         this.rt = other.rt
+        this.accelX = other.accelX
+        this.accelY = other.accelY
+        this.accelZ = other.accelZ
+        this.gyroX = other.gyroX
+        this.gyroY = other.gyroY
+        this.gyroZ = other.gyroZ
+        this.joyconType = other.joyconType
+        this.battery = other.battery
     }
-    
+
     fun equalsExceptSeq(other: ControllerState): Boolean {
         return this.buttons == other.buttons &&
                this.lx == other.lx && this.ly == other.ly &&
                this.rx == other.rx && this.ry == other.ry &&
-               this.lt == other.lt && this.rt == other.rt
+               this.lt == other.lt && this.rt == other.rt &&
+               this.accelX == other.accelX && this.accelY == other.accelY && this.accelZ == other.accelZ &&
+               this.gyroX == other.gyroX && this.gyroY == other.gyroY && this.gyroZ == other.gyroZ &&
+               this.joyconType == other.joyconType
     }
 }
 
@@ -50,11 +69,16 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
 
     val state = ControllerState()
     private val lastSentState = ControllerState()
+    // Fix 5: class-level ByteBuffer to avoid re-allocating each send
+    private val sendBuf: ByteBuffer = ByteBuffer.allocate(41).also { it.order(ByteOrder.BIG_ENDIAN) }
     
     var onDisconnect: (() -> Unit)? = null
+    var onServerFull: (() -> Unit)? = null
     var isRumbleEnabled = true
+    var isPaused = false
 
     companion object {
+        // Returns player index 1-4 on success, 0 for server full, -1 on failure
         fun pingServer(ip: String, port: Int): Int {
             var tempSocket: DatagramSocket? = null
             try {
@@ -72,6 +96,7 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
                 if (response.startsWith("PONG:")) {
                     return response.split(":")[1].toIntOrNull() ?: 1
                 }
+                if (response == "FULL") return 0 // Server is at max capacity
                 return if (response == "PONG") 1 else -1
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -102,48 +127,71 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
                             socket?.receive(pkt)
                             val msg = String(pkt.data, 0, pkt.length).trim()
                             lastRecvTime.set(System.currentTimeMillis())
-                            if (msg == "DISCONNECT") {
-                                onDisconnect?.invoke()
-                            } else if (msg.startsWith("RUMBLE:")) {
-                                val parts = msg.split(":")
-                                if (parts.size == 3) {
-                                    val large = parts[1].toIntOrNull() ?: 0
-                                    val small = parts[2].toIntOrNull() ?: 0
-                                    handleRumble(large, small)
+                            when {
+                                msg == "DISCONNECT" -> onDisconnect?.invoke()
+                                msg == "FULL" -> onServerFull?.invoke()
+                                msg.startsWith("RUMBLE:") -> {
+                                    val parts = msg.split(":")
+                                    if (parts.size == 3) {
+                                        val large = parts[1].toIntOrNull() ?: 0
+                                        val small = parts[2].toIntOrNull() ?: 0
+                                        handleRumble(large, small)
+                                    }
                                 }
                             }
-                        } catch (e: SocketTimeoutException) {
+                        } catch (_: SocketTimeoutException) {
                             // Expected, just loop
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             if (!isRunning) break
                         }
                     }
                 }.start()
 
-                val buf = ByteBuffer.allocate(15)
-                buf.order(ByteOrder.BIG_ENDIAN)
-
+                val pingPacket = "PING".toByteArray()
+                var lastPingTime = System.currentTimeMillis()
                 var lastSendTime = System.currentTimeMillis()
-                var checkTimeout = true
 
                 while (isRunning) {
                     val now = System.currentTimeMillis()
+
+                    // If we haven't heard from the server in 10 seconds, drop the connection
+                    if (now - lastRecvTime.get() > 10000) {
+                        onDisconnect?.invoke()
+                        break
+                    }
+
+                    // Keep the server's PONG liveness reply flowing (the server no longer sends its own PING)
+                    if (now - lastPingTime > 2000) {
+                        try { socket?.send(DatagramPacket(pingPacket, pingPacket.size, address, port)) } catch (_: Exception) {}
+                        lastPingTime = now
+                    }
+
                     val stateChanged = !state.equalsExceptSeq(lastSentState)
-                    val heartbeatDue = (now - lastSendTime) > 300 // Send heartbeat every 300ms to keep connection alive
+                    // Fix 6: suppress heartbeats when paused (still send PING above for keepalive)
+                    val heartbeatDue = !isPaused && (now - lastSendTime) > 300
 
                     if (stateChanged || heartbeatDue) {
-                        buf.clear()
-                        buf.put(1.toByte()) // version
-                        buf.putShort(state.seq.toShort())
-                        buf.putShort(state.buttons.toShort())
-                        buf.putShort(state.lx)
-                        buf.putShort(state.ly)
-                        buf.putShort(state.rx)
-                        buf.putShort(state.ry)
-                        buf.put(state.lt)
-                        buf.put(state.rt)
+                        sendBuf.clear()
+                        sendBuf.put(1.toByte()) // version
+                        sendBuf.putShort(state.seq.toShort())
+                        sendBuf.putShort(state.buttons.toShort())
+                        sendBuf.putShort(state.lx)
+                        sendBuf.putShort(state.ly)
+                        sendBuf.putShort(state.rx)
+                        sendBuf.putShort(state.ry)
+                        sendBuf.put(state.lt)
+                        sendBuf.put(state.rt)
+                        sendBuf.putFloat(state.accelX)
+                        sendBuf.putFloat(state.accelY)
+                        sendBuf.putFloat(state.accelZ)
+                        sendBuf.putFloat(state.gyroX)
+                        sendBuf.putFloat(state.gyroY)
+                        sendBuf.putFloat(state.gyroZ)
+                        // Joy-Con metadata (2 bytes) — keeps the server's offset stable at data.Length >= 41
+                        sendBuf.put(state.joyconType)
+                        sendBuf.put(state.battery)
 
-                        val data = buf.array()
+                        val data = sendBuf.array()
                         val packet = DatagramPacket(data, data.size, address, port)
                         socket?.send(packet)
 
@@ -165,7 +213,7 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
                     Thread.interrupted() // clear interrupt flag
                     val dData = "DISCONNECT".toByteArray()
                     socket?.send(DatagramPacket(dData, dData.size, address, port))
-                } catch (e: Exception) {}
+                } catch (_: Exception) {}
                 socket?.close()
                 socket = null
             }
@@ -190,13 +238,8 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
         val intensity = maxOf(large, small)
         if (intensity == 0) return
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val effect = VibrationEffect.createOneShot(150, intensity)
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(150)
-        }
+        val effect = VibrationEffect.createOneShot(150L, intensity)
+        vibrator.vibrate(effect)
     }
 }
 

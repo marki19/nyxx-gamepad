@@ -1,7 +1,10 @@
 package com.nativegamepad
 
 import android.content.Context
+import android.content.pm.ActivityInfo
+import androidx.activity.OnBackPressedCallback
 import android.os.Bundle
+import android.os.BatteryManager
 import android.view.MotionEvent
 import android.view.View
 import android.widget.ArrayAdapter
@@ -11,7 +14,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Spinner
-import android.widget.Switch
+import androidx.appcompat.widget.SwitchCompat
 import android.widget.TextView
 import android.widget.ProgressBar
 import android.widget.Toast
@@ -23,23 +26,44 @@ import androidx.core.view.GravityCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.net.toUri
+import androidx.core.content.edit
 import androidx.drawerlayout.widget.DrawerLayout
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
+    private var discoveryJob: Job? = null
+
     private var sensorManager: SensorManager? = null
     private var gravitySensor: Sensor? = null
+    private var accelSensor: Sensor? = null
+    private var gyroSensor: Sensor? = null
     private var isGyroEnabled = false
+    private var isDanceModeEnabled = false
     private var gyroOffsetX = 0f
     private var gyroOffsetY = 0f
     private var smoothedTiltX = 0f
     private var smoothedTiltY = 0f
     private var needsGyroCalibration = false
+    private var calibrationFramesAccel = 0
+    private var calibrationFramesGyro = 0
+    private var sumAx = 0.0; private var sumAy = 0.0; private var sumAz = 0.0
+    private var sumGx = 0.0; private var sumGy = 0.0; private var sumGz = 0.0
+    private var gyroBiasX = 0.0; private var gyroBiasY = 0.0; private var gyroBiasZ = 0.0
     private var gyroMode = 0 // 0 = Left X, 1 = Left X+Y, 2 = Right X+Y
 
     private var udpSender: UdpSender? = null
@@ -51,13 +75,35 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
+        window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         hideSystemBars()
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         gravitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
+        accelSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        gyroSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+        
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val panel = findViewById<LinearLayout>(R.id.panelEditProperties)
+                if (panel?.visibility == View.VISIBLE) {
+                    panel.visibility = View.GONE
+                    gamepadView?.saveEditMode()
+                    return
+                }
+                val drawer = drawerLayout
+                if (drawer?.isDrawerOpen(GravityCompat.START) == true) {
+                    drawer.closeDrawer(GravityCompat.START)
+                    return
+                }
+                sensorManager?.unregisterListener(this@MainActivity)
+                udpSender?.stop()
+                bluetoothSender?.stop()
+                val intent = Intent(this@MainActivity, HomeActivity::class.java)
+                startActivity(intent)
+                finish()
+            }
+        })
         
         val mode = intent?.getStringExtra("CONNECTION_MODE")
         if (mode == "BLUETOOTH") {
@@ -78,6 +124,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (hasFocus) hideSystemBars()
     }
 
+    @android.annotation.SuppressLint("SetTextI18n")
     private fun setupHomePage() {
         setContentView(R.layout.activity_main)
 
@@ -92,6 +139,53 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             button.performClick()
         } else {
             input.setText(prefs.getString("last_ip", ""))
+            
+            // Start UDP Auto-Discovery scanner
+            discoveryJob?.cancel()
+            discoveryJob = lifecycleScope.launch(Dispatchers.IO) {
+                var socket: DatagramSocket? = null
+                try {
+                    socket = DatagramSocket()
+                    socket.broadcast = true
+                    socket.soTimeout = 2000
+                    
+                    val broadcastAddress = InetAddress.getByName("255.255.255.255")
+                    val sendData = "Nyxx_DISCOVER".toByteArray()
+                    val receiveData = ByteArray(1024)
+                    
+                    while (isActive) {
+                        try {
+                            val sendPacket = DatagramPacket(sendData, sendData.size, broadcastAddress, 55555)
+                            socket.send(sendPacket)
+                            
+                            val receivePacket = DatagramPacket(receiveData, receiveData.size)
+                            socket.receive(receivePacket)
+                            val message = String(receivePacket.data, 0, receivePacket.length)
+                            
+                            if (message.startsWith("Nyxx_SERVER:")) {
+                                val port = message.substringAfter("Nyxx_SERVER:")
+                                val ip = receivePacket.address.hostAddress
+                                
+                                runOnUiThread {
+                                    input.setText(getString(R.string.ip_port_format, ip, port.toString()))
+                                }
+                                break
+                            }
+                            
+                            kotlinx.coroutines.delay(1000)
+                        } catch (_: java.net.SocketTimeoutException) {
+                            // Ignore timeout
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            kotlinx.coroutines.delay(1000)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    socket?.close()
+                }
+            }
         }
 
         button.setOnClickListener {
@@ -108,7 +202,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 button.text = "CONNECTING..."
                 button.isEnabled = false
                 
-                prefs.edit().putString("last_ip", ipString).apply()
+                prefs.edit { putString("last_ip", ipString) }
 
                 thread {
                     val playerIndex = UdpSender.pingServer(ip, port)
@@ -118,9 +212,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         } else {
                             button.text = "CONNECT"
                             button.isEnabled = true
+                            val title: String
+                            val message: String
+                            if (playerIndex == 0) {
+                                title = "Server Full"
+                                message = "The server at $ip:$port already has 8 players connected.\n\nPlease wait for a player to disconnect and try again."
+                            } else {
+                                title = "Connection Failed"
+                                message = "Could not connect to $ip:$port.\nMake sure the server is running and your PC firewall allows UDP port $port."
+                            }
                             AlertDialog.Builder(this@MainActivity)
-                                .setTitle("Connection Failed")
-                                .setMessage("Could not connect to $ip:$port.\nMake sure the server is running and your PC firewall allows UDP port $port.")
+                                .setTitle(title)
+                                .setMessage(message)
                                 .setPositiveButton("OK", null)
                                 .show()
                         }
@@ -141,12 +244,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 .addOnSuccessListener { barcode ->
                     val rawValue = barcode.rawValue
                     if (rawValue != null) {
-                        if (rawValue.startsWith("nyxxpad://")) {
-                            val uri = android.net.Uri.parse(rawValue)
+                        if (rawValue.startsWith("Nyxx://")) {
+                            val uri = rawValue.toUri()
                             val ip = uri.getQueryParameter("ip")
                             val port = uri.getQueryParameter("port") ?: "5000"
                             if (!ip.isNullOrBlank()) {
-                                input.setText("$ip:$port")
+                                runOnUiThread {
+                                    input.setText(getString(R.string.ip_port_format, ip, port))
+                                }
                                 button.performClick()
                             }
                         } else {
@@ -172,7 +277,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 
                 val connection = url.openConnection() as java.net.HttpURLConnection
                 connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "NyxxPadClient-Updater")
+                connection.setRequestProperty("User-Agent", "NyxxClient-Updater")
                 connection.connectTimeout = 5000
                 connection.readTimeout = 5000
                 
@@ -195,9 +300,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         runOnUiThread {
                             AlertDialog.Builder(this)
                                 .setTitle("Update Available")
-                                .setMessage("A new version of NyxxPad ($tagName) is available!\n\nWould you like to download it now?")
+                                .setMessage("A new version of Nyxx ($tagName) is available!\n\nWould you like to download it now?")
                                 .setPositiveButton("Download") { _, _ ->
-                                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(htmlUrl))
+                                    val intent = Intent(Intent.ACTION_VIEW, htmlUrl.toUri())
                                     startActivity(intent)
                                 }
                                 .setNegativeButton("Later", null)
@@ -215,7 +320,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
 
     private fun startGamepad(ip: String, port: Int, playerIndex: Int) {
-        val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+        val vibrator = getSystemService(android.os.Vibrator::class.java)
         udpSender = UdpSender(ip, port, vibrator)
         udpSender?.onDisconnect = {
             runOnUiThread {
@@ -227,8 +332,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 finish()
             }
         }
+        udpSender?.onServerFull = {
+            runOnUiThread {
+                udpSender?.stop()
+                Toast.makeText(this@MainActivity, "Server is full (4 players max).", Toast.LENGTH_LONG).show()
+                val intent = Intent(this@MainActivity, HomeActivity::class.java)
+                startActivity(intent)
+                finish()
+            }
+        }
         udpSender?.start()
-        
+        updateBatteryLevel()
+
         setContentView(R.layout.activity_gamepad)
         Toast.makeText(this, "Connected as Player $playerIndex", Toast.LENGTH_LONG).show()
         
@@ -240,6 +355,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         setupGamepadViewInteractions()
     }
 
+    @android.annotation.SuppressLint("SetTextI18n")
     private fun startBluetoothGamepad() {
         bluetoothSender = BluetoothHidSender(this)
         bluetoothSender?.start()
@@ -284,6 +400,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     dY = view.y - event.rawY
                     true
                 }
+                MotionEvent.ACTION_UP -> {
+                    view.performClick()
+                    true
+                }
                 MotionEvent.ACTION_MOVE -> {
                     view.animate()
                         .x(event.rawX + dX)
@@ -318,9 +438,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val btnOpacityMinus = panel.findViewById<Button>(R.id.btnOpacityMinus)
         val btnOpacityPlus = panel.findViewById<Button>(R.id.btnOpacityPlus)
         
-        val switchVisible = panel.findViewById<Switch>(R.id.switchVisible)
-        val switchTurbo = panel.findViewById<Switch>(R.id.switchTurbo)
-        val switchAnalog = panel.findViewById<Switch>(R.id.switchAnalog)
+        val switchVisible = panel.findViewById<SwitchCompat>(R.id.switchVisible)
+        val switchTurbo = panel.findViewById<SwitchCompat>(R.id.switchTurbo)
+        val switchAnalog = panel.findViewById<SwitchCompat>(R.id.switchAnalog)
 
         val btnCancelEdit = panel.findViewById<Button>(R.id.btnCancelEdit)
         val btnSaveEdit = panel.findViewById<Button>(R.id.btnSaveEdit)
@@ -357,12 +477,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             config.scale = (config.scale - 0.1f).coerceAtLeast(0.5f)
             view.buttonConfigs[groupName] = config
             view.applyScales()
+            view.invalidate()
+            view.saveConfigState()
             updateUI()
         }
         btnSizePlus?.setOnClickListener {
             config.scale = (config.scale + 0.1f).coerceAtMost(2.0f)
             view.buttonConfigs[groupName] = config
             view.applyScales()
+            view.invalidate()
+            view.saveConfigState()
             updateUI()
         }
 
@@ -370,24 +494,30 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             config.spacing = (config.spacing - 0.1f).coerceAtLeast(0.5f)
             view.buttonConfigs[groupName] = config
             view.applyScales()
+            view.invalidate()
+            view.saveConfigState()
             updateUI()
         }
         btnSpacingPlus?.setOnClickListener {
             config.spacing = (config.spacing + 0.1f).coerceAtMost(2.0f)
             view.buttonConfigs[groupName] = config
             view.applyScales()
+            view.invalidate()
+            view.saveConfigState()
             updateUI()
         }
 
         btnOpacityMinus?.setOnClickListener {
-            config.opacity = (config.opacity - 0.1f).coerceAtLeast(0.0f)
+            config.opacity = (config.opacity - 0.1f).coerceAtLeast(0.1f)
             view.buttonConfigs[groupName] = config
+            view.saveConfigState()
             view.invalidate()
             updateUI()
         }
         btnOpacityPlus?.setOnClickListener {
             config.opacity = (config.opacity + 0.1f).coerceAtMost(1.0f)
             view.buttonConfigs[groupName] = config
+            view.saveConfigState()
             view.invalidate()
             updateUI()
         }
@@ -395,17 +525,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         switchVisible?.setOnCheckedChangeListener { _, isChecked ->
             config.visible = isChecked
             view.buttonConfigs[groupName] = config
+            view.saveConfigState()
             view.invalidate()
         }
 
         switchTurbo?.setOnCheckedChangeListener { _, isChecked ->
             config.turbo = isChecked
             view.buttonConfigs[groupName] = config
+            view.saveConfigState()
         }
 
         switchAnalog?.setOnCheckedChangeListener { _, isChecked ->
             config.analogTrigger = isChecked
             view.buttonConfigs[groupName] = config
+            view.saveConfigState()
         }
 
         btnSaveEdit?.setOnClickListener {
@@ -424,21 +557,28 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         
         val layoutGyroMode = findViewById<LinearLayout>(R.id.layoutGyroMode)
         val spinnerGyroMode = findViewById<Spinner>(R.id.spinnerGyroMode)
-        val switchGyro = findViewById<Switch>(R.id.switchGyro)
-        val btnCalibrateGyro = findViewById<Button>(R.id.btnCalibrateGyro)
+        val switchGyro = findViewById<SwitchCompat>(R.id.switchGyro)
+        val switchDanceMode = findViewById<SwitchCompat>(R.id.switchDanceMode)
+        val btnCalibrateSensors = findViewById<Button>(R.id.btnCalibrateSensors)
         
         switchGyro?.setOnCheckedChangeListener { _, isChecked ->
+            // Fix 7: Warn if gyro is toggled in Bluetooth mode
+            if (isChecked && bluetoothSender != null) {
+                Toast.makeText(this, "Gyro steering is not supported in Bluetooth mode.", Toast.LENGTH_LONG).show()
+                switchGyro.isChecked = false
+                return@setOnCheckedChangeListener
+            }
             isGyroEnabled = isChecked
             view.isGyroEnabled = isChecked
             layoutGyroMode?.visibility = if (isChecked) View.VISIBLE else View.GONE
-            btnCalibrateGyro?.visibility = if (isChecked) View.VISIBLE else View.GONE
+            btnCalibrateSensors?.visibility = if (isChecked || isDanceModeEnabled) View.VISIBLE else View.GONE
             
             if (isChecked) {
                 gravitySensor?.let {
                     sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
                 }
             } else {
-                sensorManager?.unregisterListener(this)
+                sensorManager?.unregisterListener(this, gravitySensor)
                 val state = udpSender?.state ?: bluetoothSender?.state
                 if (state != null) {
                     state.lx = 0
@@ -446,6 +586,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     state.rx = 0
                     state.ry = 0
                 }
+            }
+        }
+        
+        switchDanceMode?.setOnCheckedChangeListener { _, isChecked ->
+            isDanceModeEnabled = isChecked
+            btnCalibrateSensors?.visibility = if (isChecked || isGyroEnabled) View.VISIBLE else View.GONE
+            if (isChecked) {
+                accelSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+                gyroSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+            } else {
+                sensorManager?.unregisterListener(this, accelSensor)
+                sensorManager?.unregisterListener(this, gyroSensor)
             }
         }
         
@@ -463,20 +615,40 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
         
-        findViewById<Button>(R.id.btnCalibrateGyro)?.setOnClickListener {
+        findViewById<Button>(R.id.btnCalibrateSensors)?.setOnClickListener {
             needsGyroCalibration = true
-            Toast.makeText(this, "Calibrating Gyro...", Toast.LENGTH_SHORT).show()
+            // Only count frames for sensors that actually exist; otherwise finishCalibration()
+            // would wait forever for a counter that never decrements.
+            calibrationFramesAccel = if (accelSensor != null) 30 else 0
+            calibrationFramesGyro = if (gyroSensor != null) 30 else 0
+            if (calibrationFramesAccel == 0 && calibrationFramesGyro == 0) {
+                Toast.makeText(this, "No motion sensors available to calibrate.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            sumAx = 0.0; sumAy = 0.0; sumAz = 0.0
+            sumGx = 0.0; sumGy = 0.0; sumGz = 0.0
+            Toast.makeText(this, "Hold phone completely still for 1 second...", Toast.LENGTH_LONG).show()
         }
 
-        val switchRumble = findViewById<Switch>(R.id.switchRumble)
+        val switchRumble = findViewById<SwitchCompat>(R.id.switchRumble)
+        // Fix 8: Hide Rumble toggle in Bluetooth mode (BT HID doesn't support rumble)
+        if (bluetoothSender != null) {
+            switchRumble?.visibility = View.GONE
+        }
         switchRumble?.setOnCheckedChangeListener { _, isChecked ->
             udpSender?.isRumbleEnabled = isChecked
-            bluetoothSender?.isRumbleEnabled = isChecked
         }
         
         // Profiles Setup
         val spinner = findViewById<Spinner>(R.id.spinnerProfile)
-        val profiles = listOf(GamepadProfiles.NINTENDO, GamepadProfiles.XBOX, GamepadProfiles.PSP)
+        val profiles = listOf(
+            GamepadProfiles.NINTENDO,
+            GamepadProfiles.JOYCON_L,
+            GamepadProfiles.JOYCON_R,
+            GamepadProfiles.WII,
+            GamepadProfiles.XBOX,
+            GamepadProfiles.PSP
+        )
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, profiles.map { it.displayName })
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
@@ -490,8 +662,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, viewSelected: View?, position: Int, id: Long) {
-                view.setProfile(profiles[position])
-                sharedPrefs.edit().putString("lastProfile", profiles[position].id).apply()
+                val p = profiles[position]
+                view.setProfile(p)
+                udpSender?.state?.joyconType = when (p.id) {
+                    "joycon_l" -> 1 // Left
+                    "joycon_r" -> 0 // Right
+                    else -> 2       // Pro
+                }.toByte()
+                sharedPrefs.edit { putString("lastProfile", p.id) }
+                requestedOrientation = if (p.id == "wii" || p.id == "joycon_l" || p.id == "joycon_r") {
+                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                } else {
+                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                }
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
@@ -499,6 +682,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         findViewById<Button>(R.id.btnEditLayout).setOnClickListener {
             view.enterEditMode()
             drawerLayout?.closeDrawers()
+        }
+        
+        findViewById<android.widget.ImageButton>(R.id.btnOpenMenu)?.setOnClickListener {
+            drawerLayout?.openDrawer(androidx.core.view.GravityCompat.START)
         }
         
         findViewById<Button>(R.id.btnResetLayout).setOnClickListener {
@@ -531,15 +718,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        discoveryJob?.cancel()
         sensorManager?.unregisterListener(this)
         udpSender?.stop()
         bluetoothSender?.destroy()
     }
 
+    private fun updateBatteryLevel() {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val capacity = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
+        udpSender?.state?.battery = ((capacity + 12) / 25).coerceIn(0, 4).toByte()
+    }
+
     override fun onResume() {
         super.onResume()
+        updateBatteryLevel()
         if (isGyroEnabled) {
             gravitySensor?.let {
+                sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+            }
+        }
+        if (isDanceModeEnabled) {
+            accelSensor?.let {
+                sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+            }
+            gyroSensor?.let {
                 sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
             }
         }
@@ -559,18 +762,74 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
     
-    override fun onBackPressed() {
-        sensorManager?.unregisterListener(this)
-        udpSender?.stop()
-        bluetoothSender?.stop()
-        val intent = Intent(this, HomeActivity::class.java)
-        startActivity(intent)
-        finish()
-    }
+
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event == null || !isGyroEnabled) return
-        if (event.sensor.type == Sensor.TYPE_GRAVITY) {
+        if (event == null) return
+        
+        when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                val state = udpSender?.state
+                if (state != null) {
+                    var ax = event.values[0].toDouble()
+                    var ay = event.values[1].toDouble()
+                    var az = event.values[2].toDouble()
+
+                    if (calibrationFramesAccel > 0) {
+                        sumAx += ax
+                        sumAy += ay
+                        sumAz += az
+                        calibrationFramesAccel--
+                        
+                        if (calibrationFramesAccel == 0 && calibrationFramesGyro == 0) {
+                            finishCalibration()
+                        }
+                        return
+                    }
+
+                    // Cemuhook expects raw local hardware axes.
+                    // We only convert gravity to Gs, but we do NOT apply a fixed rotation matrix
+                    // because it would cause cross-talk during physical yaw.
+
+                    state.accelX = ax.toFloat()
+                    state.accelY = ay.toFloat()
+                    state.accelZ = az.toFloat()
+                }
+            }
+            Sensor.TYPE_GYROSCOPE -> {
+                val state = udpSender?.state
+                if (state != null) {
+                    var gx = event.values[0].toDouble()
+                    var gy = event.values[1].toDouble()
+                    var gz = event.values[2].toDouble()
+
+                    if (calibrationFramesGyro > 0) {
+                        sumGx += gx
+                        sumGy += gy
+                        sumGz += gz
+                        calibrationFramesGyro--
+                        
+                        if (calibrationFramesAccel == 0 && calibrationFramesGyro == 0) {
+                            finishCalibration()
+                        }
+                        return
+                    }
+
+                    // Subtract the resting drift bias first
+                    gx -= gyroBiasX
+                    gy -= gyroBiasY
+                    gz -= gyroBiasZ
+
+                    // Do NOT apply a fixed rotation matrix to gyro data.
+                    // The gyro axes are local. A fixed world rotation causes severe cross-talk.
+
+                    state.gyroX = gx.toFloat()
+                    state.gyroY = gy.toFloat()
+                    state.gyroZ = gz.toFloat()
+                }
+            }
+            Sensor.TYPE_GRAVITY -> {
+                if (!isGyroEnabled) return
             if (needsGyroCalibration) {
                 gyroOffsetX = event.values[0]
                 gyroOffsetY = event.values[1]
@@ -602,10 +861,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
             
             // Y-axis (Roll / Left-Right)
-            if (Math.abs(smoothedTiltY) > deadzone) {
-                val magnitude = (Math.abs(smoothedTiltY) - deadzone) / (6f - deadzone)
-                outY = Math.signum(smoothedTiltY) * magnitude.coerceIn(0f, 1f)
-                outY = outY * outY * Math.signum(outY)
+            if (kotlin.math.abs(smoothedTiltY) > deadzone) {
+                val magnitude = (kotlin.math.abs(smoothedTiltY) - deadzone) / (6f - deadzone)
+                outY = kotlin.math.sign(smoothedTiltY) * magnitude.coerceIn(0f, 1f)
+                outY = outY * outY * kotlin.math.sign(outY)
             }
             
             val lx = (outY * 32767).toInt().toShort() // Left/Right steering mapped to Y tilt
@@ -615,14 +874,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             if (gamepadView?.isInputPaused == false) {
                 val state = udpSender?.state ?: bluetoothSender?.state
                 if (state != null) {
-                    if (gyroMode == 0) {
-                        state.lx = lx
-                    } else if (gyroMode == 1) {
-                        state.lx = lx
-                        state.ly = ly
-                    } else if (gyroMode == 2) {
-                        state.rx = lx
-                        state.ry = ly
+                    when (gyroMode) {
+                        0 -> state.lx = lx
+                        1 -> {
+                            state.lx = lx
+                            state.ly = ly
+                        }
+                        2 -> {
+                            state.rx = lx
+                            state.ry = ly
+                        }
                     }
                 }
             }
@@ -631,6 +892,22 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             gamepadView?.gyroTiltX = outY
             gamepadView?.gyroTiltY = -outX
             gamepadView?.postInvalidate()
+            }
+        }
+    }
+    private fun finishCalibration() {
+        
+        gyroBiasX = sumGx / 30.0
+        gyroBiasY = sumGy / 30.0
+        gyroBiasZ = sumGz / 30.0
+
+        // We do not compute a base Euler angle because applying a fixed world rotation
+        // to local IMU axes causes severe cross-talk when the device orientation changes.
+        // The bias subtraction above is the only calibration needed.
+
+        runOnUiThread {
+            gamepadView?.triggerCalibrationFlash()
+            Toast.makeText(this@MainActivity, "Sensors Calibrated & Drift Cancelled!", Toast.LENGTH_SHORT).show()
         }
     }
 
