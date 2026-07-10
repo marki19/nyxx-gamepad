@@ -15,7 +15,9 @@
             <RowDefinition Height="2*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Nyxx Server" FontSize="26" FontWeight="Bold" Foreground="#8A2BE2" HorizontalAlignment="Center" Margin="0,0,0,20">
+        <TextBlock HorizontalAlignment="Center" Margin="0,0,0,20">
+            <Run Text="Nyxx Server" FontSize="26" FontWeight="Bold" Foreground="#8A2BE2"/>
+            <Run x:Name="txtVersion" Text=" v1.0.0" FontSize="16" FontWeight="Normal" Foreground="#A0A5B0"/>
             <TextBlock.Effect>
                 <DropShadowEffect Color="#8A2BE2" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
             </TextBlock.Effect>

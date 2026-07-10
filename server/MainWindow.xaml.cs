@@ -34,6 +34,10 @@ namespace NativeGamepadServer
             _ = CheckForUpdatesAsync();
             AppendLog("Nyxx Server UI Initialized. Ready to start.");
             UpdateQrCode();
+
+            var versionObj = typeof(MainWindow).Assembly.GetName().Version;
+            string localVersion = "v" + (versionObj != null ? $"{versionObj.Major}.{versionObj.Minor}.{versionObj.Build}" : "1.0.0");
+            txtVersion.Text = " " + localVersion;
         }
 
         private async Task CheckForUpdatesAsync()

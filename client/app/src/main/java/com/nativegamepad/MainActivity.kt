@@ -264,56 +264,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     Toast.makeText(this, "Scan failed: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
         }
-        
-        checkForUpdates()
-    }
-
-    private fun checkForUpdates() {
-        thread {
-            try {
-                val repoOwner = "marki19"
-                val repoName = "nyxx-gamepad"
-                val url = java.net.URL("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
-                
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "NyxxClient-Updater")
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                
-                if (connection.responseCode == 200) {
-                    val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
-                    val response = StringBuilder()
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        response.append(line)
-                    }
-                    reader.close()
-                    
-                    val jsonResponse = org.json.JSONObject(response.toString())
-                    val tagName = jsonResponse.optString("tag_name", "")
-                    val htmlUrl = jsonResponse.optString("html_url", "")
-                    
-                    val localVersion = "v" + BuildConfig.VERSION_NAME
-                    
-                    if (tagName.isNotEmpty() && tagName != localVersion) {
-                        runOnUiThread {
-                            AlertDialog.Builder(this)
-                                .setTitle("Update Available")
-                                .setMessage("A new version of Nyxx ($tagName) is available!\n\nWould you like to download it now?")
-                                .setPositiveButton("Download") { _, _ ->
-                                    val intent = Intent(Intent.ACTION_VIEW, htmlUrl.toUri())
-                                    startActivity(intent)
-                                }
-                                .setNegativeButton("Later", null)
-                                .show()
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 
 

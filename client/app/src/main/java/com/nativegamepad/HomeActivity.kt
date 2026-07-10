@@ -16,8 +16,15 @@ import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import kotlin.concurrent.thread
+import android.net.Uri
+import android.widget.TextView
 
 class HomeActivity : AppCompatActivity() {
+
+    companion object {
+        var hasCheckedForUpdates = false
+    }
 
     private val discoverabilityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode != android.app.Activity.RESULT_CANCELED) {
@@ -31,6 +38,8 @@ class HomeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
+
+        findViewById<TextView>(R.id.tvAppVersion).text = "v" + BuildConfig.VERSION_NAME
 
         val intentData = intent?.data
         if (intentData != null && intentData.scheme == "Nyxx" && intentData.host == "connect") {
@@ -49,6 +58,11 @@ class HomeActivity : AppCompatActivity() {
         // FAQ (?) button - opens FAQ & Documentation
         findViewById<View>(R.id.faqButton).setOnClickListener {
             startActivity(Intent(this, FaqActivity::class.java))
+        }
+
+        if (!hasCheckedForUpdates) {
+            hasCheckedForUpdates = true
+            checkForUpdates()
         }
 
         val wifiButton = findViewById<Button>(R.id.btnConnectWifi)
@@ -126,5 +140,52 @@ class HomeActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun checkForUpdates() {
+        thread {
+            try {
+                val repoOwner = "marki19"
+                val repoName = "nyxx-gamepad"
+                val url = java.net.URL("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
+                
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                
+                if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                    val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
+                    val response = StringBuilder()
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        response.append(line)
+                    }
+                    reader.close()
+                    
+                    val jsonResponse = org.json.JSONObject(response.toString())
+                    val tagName = jsonResponse.optString("tag_name", "")
+                    val htmlUrl = jsonResponse.optString("html_url", "")
+                    
+                    val localVersion = "v" + BuildConfig.VERSION_NAME
+                    
+                    if (tagName.isNotEmpty() && tagName != localVersion) {
+                        runOnUiThread {
+                            AlertDialog.Builder(this)
+                                .setTitle("Update Available")
+                                .setMessage("A new version of Nyxx ($tagName) is available!\n\nWould you like to download it now?")
+                                .setPositiveButton("Download") { _, _ ->
+                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl))
+                                    startActivity(browserIntent)
+                                }
+                                .setNegativeButton("Later", null)
+                                .show()
+                        }
+                    }
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
