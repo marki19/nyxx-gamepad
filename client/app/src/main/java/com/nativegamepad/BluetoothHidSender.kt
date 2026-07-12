@@ -40,6 +40,8 @@ class BluetoothHidSender(private val context: Context) {
         }
     }
 
+    var onDisconnected: (() -> Unit)? = null
+
     private val callback = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             isRegistered = registered
@@ -66,9 +68,10 @@ class BluetoothHidSender(private val context: Context) {
                 connectedDevice = device
                 showToast("Bluetooth HID Connected: ${device.name}")
             } else if (connectionState == BluetoothProfile.STATE_DISCONNECTED) {
-                if (connectedDevice == device) {
+                if (connectedDevice == device || connectedDevice == null) {
                     connectedDevice = null
                     showToast("Bluetooth HID Disconnected")
+                    onDisconnected?.invoke()
                 }
             }
         }

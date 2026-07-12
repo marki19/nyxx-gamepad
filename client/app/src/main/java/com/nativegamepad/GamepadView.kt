@@ -188,8 +188,10 @@ class GamepadView @JvmOverloads constructor(
     var onMenuRequested: (() -> Unit)? = null
     var onButtonEditRequested: ((String) -> Unit)? = null
     var onEditModeExited: (() -> Unit)? = null
+    var onCalibrateRequested: (() -> Unit)? = null
 
     var isGyroEnabled: Boolean = false
+    var isDanceModeEnabled: Boolean = false
     var gyroTargetMode: Int = 0 // 0=L(X), 1=L(X+Y), 2=R(X+Y)
     
     var playerIndex = 1
@@ -200,11 +202,11 @@ class GamepadView @JvmOverloads constructor(
 
     private fun getPlayerColor(): Int {
         return when (playerIndex) {
-            1 -> GamepadColors.xTop // Blue
+            1 -> ThemeConfig.primaryColor
             2 -> GamepadColors.aTop // Red
             3 -> GamepadColors.yTop // Green
             4 -> GamepadColors.bTop // Yellow
-            else -> GamepadColors.xTop
+            else -> ThemeConfig.primaryColor
         }
     }
 
@@ -237,6 +239,7 @@ class GamepadView @JvmOverloads constructor(
     var showTelemetry = prefs.getBoolean("showTelemetry", false)
 
     var isEditMode = false
+    var isPreviewMode = false
     private var draggingGroup: String? = null
     private var dragStartX = 0f
     private var dragStartY = 0f
@@ -251,7 +254,8 @@ class GamepadView @JvmOverloads constructor(
         "LeftJoy", "RightJoy", "DPad", "ABXY",
         "L1", "L2", "R1", "R2", "SL", "SR",
         "Sel", "St", "Home",
-        "BtnA", "BtnB", "Btn1", "Btn2"
+        "BtnA", "BtnB", "Btn1", "Btn2",
+        "Calibrate"
     )
 
     class Joystick(var group: String, var cx: Float = 0f, var cy: Float = 0f, var baseRadius: Float = 0f) {
@@ -287,7 +291,7 @@ class GamepadView @JvmOverloads constructor(
                 val h2 = radius * 0.75f
                 x >= cx - w2 - 20f && x <= cx + w2 + 20f && y >= cy - h2 - 20f && y <= cy + h2 + 20f
             } else {
-                val hitPadding = if (group == "Home" || group == "Sel" || group == "St") 1.1f else 1.5f
+                val hitPadding = if (group == "Home" || group == "Sel" || group == "St" || group == "Calibrate") 1.1f else 1.5f
                 hypot((x - cx).toDouble(), (y - cy).toDouble()) <= radius * hitPadding
             }
         }
@@ -356,6 +360,7 @@ class GamepadView @JvmOverloads constructor(
         for (spec in profile.buttons) {
             buttons.add(ButtonDef(spec))
         }
+        buttons.add(ButtonDef(ButtonSpec("Calibrate", 0, "Calibrate", isOverlayUI = false)))
         applyScales()
         invalidate()
     }
@@ -395,6 +400,15 @@ class GamepadView @JvmOverloads constructor(
         
         var conf: ButtonConfig
         var off: PointF
+
+        // Global Overlay UI (Menu, Save, Cancel)
+        buttons.find { it.name == "Menu" }?.apply { cx = safeInsetLeft + h * 0.15f; cy = h * 0.15f; radius = baseRadius * 0.8f }
+        buttons.find { it.name == "Save" }?.apply { cx = safeInsetLeft + w - (h * 0.15f); cy = h * 0.15f; radius = baseRadius * 0.9f }
+        buttons.find { it.name == "Cancel" }?.apply { cx = safeInsetLeft + w - (h * 0.35f); cy = h * 0.15f; radius = baseRadius * 0.9f }
+
+        // Calibrate Button
+        conf = getConfig("Calibrate"); off = getOffset("Calibrate")
+        buttons.find { it.group == "Calibrate" }?.apply { cx = safeInsetLeft + w * 0.5f + off.x; cy = h * 0.15f + off.y; radius = baseRadius * 0.8f * conf.scale }
 
         if (currentProfile.id == "wii") {
             // DPad
@@ -574,6 +588,24 @@ class GamepadView @JvmOverloads constructor(
             buttons.find { it.name == "Triangle" && it.group == "ABXY" }?.apply { cx = abxyCx; cy = abxyCy - aSpacing; radius = aBtnR } // Top
             buttons.find { it.name == "Square" && it.group == "ABXY" }?.apply { cx = abxyCx - aSpacing; cy = abxyCy; radius = aBtnR } // Left
         }
+        
+        // Wii Remote (Held Sideways)
+        if (currentProfile.id == "wii") {
+            // BtnA is usually near the center-right when held sideways
+            conf = getConfig("BtnA"); off = getOffset("BtnA")
+            buttons.find { it.group == "BtnA" }?.apply { cx = safeInsetLeft + w * 0.70f + off.x; cy = h * 0.45f + off.y; radius = baseRadius * 1.1f * conf.scale }
+            
+            // BtnB is the trigger underneath, usually placed above A in horizontal grip UI
+            conf = getConfig("BtnB"); off = getOffset("BtnB")
+            buttons.find { it.group == "BtnB" }?.apply { cx = safeInsetLeft + w * 0.70f + off.x; cy = h * 0.20f + off.y; radius = baseRadius * 1.1f * conf.scale }
+            
+            // 1 and 2 buttons are on the far right
+            conf = getConfig("Btn1"); off = getOffset("Btn1")
+            buttons.find { it.group == "Btn1" }?.apply { cx = safeInsetLeft + w * 0.85f + off.x; cy = h * 0.45f + off.y; radius = baseRadius * 0.8f * conf.scale }
+            
+            conf = getConfig("Btn2"); off = getOffset("Btn2")
+            buttons.find { it.group == "Btn2" }?.apply { cx = safeInsetLeft + w * 0.95f + off.x; cy = h * 0.45f + off.y; radius = baseRadius * 0.8f * conf.scale }
+        }
 
         // Left Joystick
         conf = getConfig("LeftJoy"); off = getOffset("LeftJoy")
@@ -592,10 +624,6 @@ class GamepadView @JvmOverloads constructor(
         rightJoy.radius = joyR * conf.scale
         rightJoy.knobX = rightJoy.cx
         rightJoy.knobY = rightJoy.cy
-
-        buttons.find { it.name == "Menu" }?.apply { cx = safeInsetLeft + h * 0.15f; cy = h * 0.15f; radius = baseRadius * 0.8f }
-        buttons.find { it.name == "Save" }?.apply { cx = safeInsetLeft + w - (h * 0.15f); cy = h * 0.15f; radius = baseRadius * 0.9f }
-        buttons.find { it.name == "Cancel" }?.apply { cx = safeInsetLeft + w - (h * 0.35f); cy = h * 0.15f; radius = baseRadius * 0.9f }
 
         invalidate()
     }
@@ -653,7 +681,7 @@ class GamepadView @JvmOverloads constructor(
         for (g in groupNames) {
             originalGroupOffsets[g] = PointF(groupOffsets[g]?.x ?: 0f, groupOffsets[g]?.y ?: 0f)
         }
-        
+
         val state = udpSender?.state ?: bluetoothSender?.state
         if (state != null) {
             if (!isGyroEnabled) state.lx = 0
@@ -663,9 +691,15 @@ class GamepadView @JvmOverloads constructor(
         }
         invalidate()
     }
-    
+
+    fun togglePreviewMode() {
+        isPreviewMode = !isPreviewMode
+        invalidate()
+    }
+
     fun saveEditMode() {
         isEditMode = false
+        isPreviewMode = false
         draggingGroup = null
         saveConfigState()
         onEditModeExited?.invoke()
@@ -674,6 +708,7 @@ class GamepadView @JvmOverloads constructor(
 
     fun cancelEditMode() {
         isEditMode = false
+        isPreviewMode = false
         draggingGroup = null
         for ((group, pt) in originalGroupOffsets) {
             groupOffsets[group] = PointF(pt.x, pt.y)
@@ -719,6 +754,11 @@ class GamepadView @JvmOverloads constructor(
             return handleEditModeTouch(event, action, pointerId, x, y)
         }
 
+        // Preview mode: allow touch to test layout without sending input
+        if (isPreviewMode) {
+            return handlePreviewTouch(event, action, pointerId, x, y)
+        }
+
         val upIndex = if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL) event.actionIndex else -1
         
         for (btn in buttons) {
@@ -755,9 +795,18 @@ class GamepadView @JvmOverloads constructor(
                 val config = getConfig(btn.group)
                 if (!config.visible) continue
                 
+                if (btn.group == "Calibrate" && !isEditMode && !isGyroEnabled && !isDanceModeEnabled) {
+                    continue
+                }
+                
                 if (btn.contains(pX, pY)) {
                     btn.isPressed = true
                     btn.pointerId = pId
+                    
+                    if (btn.group == "Calibrate" && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)) {
+                        onCalibrateRequested?.invoke()
+                    }
+                    
                     if (btn.isTrigger && config.analogTrigger) {
                         val dist = hypot((pX - btn.cx).toDouble(), (pY - btn.cy).toDouble()).toFloat()
                         val maxDist = btn.radius * 2.5f
@@ -821,8 +870,10 @@ class GamepadView @JvmOverloads constructor(
                         val py = event.getY(pIndex)
                         val dx = px - dragStartX
                         val dy = py - dragStartY
-                        if (hypot(dx.toDouble(), dy.toDouble()) > 10) {
-                            didDrag = true
+                        
+                        // Atomic drag detection
+                        if (hypot(dx.toDouble(), dy.toDouble()) > 5f) {
+                            if (!didDrag) didDrag = true
                             groupOffsets[group] = PointF(dragInitialOffsetX + dx, dragInitialOffsetY + dy)
                             applyScales()
                             invalidate()
@@ -831,21 +882,64 @@ class GamepadView @JvmOverloads constructor(
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                if (pointerId == dragPointerId) {
-                    if (!didDrag && draggingGroup != null) {
-                        onButtonEditRequested?.invoke(draggingGroup!!)
-                    } else if (didDrag) {
-                        saveConfigState()
+                val group = draggingGroup
+                if (group != null && dragPointerId != -1) {
+                    if (pointerId == dragPointerId) {
+                        // Check final distance just in case MOVE events were dropped
+                        val pIndex = event.findPointerIndex(dragPointerId)
+                        if (pIndex != -1 && !didDrag) {
+                            val px = event.getX(pIndex)
+                            val py = event.getY(pIndex)
+                            if (hypot((px - dragStartX).toDouble(), (py - dragStartY).toDouble()) > 5f) {
+                                didDrag = true
+                                groupOffsets[group] = PointF(dragInitialOffsetX + (px - dragStartX), dragInitialOffsetY + (py - dragStartY))
+                                applyScales()
+                            }
+                        }
+
+                        val wasDrag = didDrag
+                        // Atomic cleanup before invoking callbacks
+                        draggingGroup = null
+                        dragPointerId = -1
+                        didDrag = false
+
+                        if (!wasDrag) {
+                            onButtonEditRequested?.invoke(group)
+                        } else {
+                            saveConfigState()
+                        }
+                        invalidate()
                     }
-                    draggingGroup = null
-                    dragPointerId = -1
-                    invalidate()
                 } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                     // Fallback to clear if all pointers are up
                     draggingGroup = null
                     dragPointerId = -1
+                    didDrag = false
                     invalidate()
                 }
+            }
+        }
+        return true
+    }
+
+    // Preview mode: test layout without sending input
+    private fun handlePreviewTouch(event: MotionEvent, action: Int, pointerId: Int, x: Float, y: Float): Boolean {
+        when (action) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                // Visual feedback only - no state changes
+                for (btn in buttons) {
+                    if (btn.contains(x, y)) {
+                        btn.isPressed = true
+                        invalidate()
+                        return true
+                    }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                for (btn in buttons) {
+                    btn.isPressed = false
+                }
+                invalidate()
             }
         }
         return true
@@ -1006,7 +1100,12 @@ class GamepadView @JvmOverloads constructor(
         
         for (btn in buttons) {
             val config = getConfig(btn.group)
-            if (!config.visible && !isEditMode) continue
+            if (btn.group == "Calibrate") {
+                if (!isEditMode && !isGyroEnabled && !isDanceModeEnabled) continue
+            } else {
+                if (!config.visible && !isEditMode) continue
+            }
+            
             val alphaInt = (config.opacity * 255).toInt()
             val isBtnPressed = btn.isPressed && !isEditMode
             
@@ -1024,20 +1123,13 @@ class GamepadView @JvmOverloads constructor(
             var textColor = GamepadColors.neutralText
 
             if (!isBtnPressed) {
-                when (btn.name) {
-                    "A" -> { baseColor = GamepadColors.aBase; topColor = GamepadColors.aTop; textColor = GamepadColors.aText }
-                    "B" -> { baseColor = GamepadColors.bBase; topColor = GamepadColors.bTop; textColor = GamepadColors.bText }
-                    "X" -> { baseColor = GamepadColors.xBase; topColor = GamepadColors.xTop; textColor = GamepadColors.xText }
-                    "Y" -> { baseColor = GamepadColors.yBase; topColor = GamepadColors.yTop; textColor = GamepadColors.yText }
-                }
+                // Monochrome base
+                baseColor = GamepadColors.neutralBase
+                topColor = GamepadColors.neutralTop
             } else {
-                when (btn.name) {
-                    "A" -> { baseColor = GamepadColors.aTop; textColor = GamepadColors.aBase }
-                    "B" -> { baseColor = GamepadColors.bTop; textColor = GamepadColors.bBase }
-                    "X" -> { baseColor = GamepadColors.xTop; textColor = GamepadColors.xBase }
-                    "Y" -> { baseColor = GamepadColors.yTop; textColor = GamepadColors.yBase }
-                    else -> { baseColor = getPlayerColor(); textColor = GamepadColors.neutralBase }
-                }
+                // Glow with Primary Theme color when pressed
+                baseColor = ThemeConfig.primaryColor
+                textColor = GamepadColors.neutralBase
             }
 
             config.colorOverride?.let { c ->
@@ -1058,6 +1150,26 @@ class GamepadView @JvmOverloads constructor(
                 paint.alpha = alphaInt
                 paint.strokeWidth = 3f
                 canvas.drawRoundRect(rect, btn.radius * 0.3f, btn.radius * 0.3f, paint)
+            } else if (btn.group == "Calibrate") {
+                canvas.drawCircle(btn.cx, btn.cy, btn.radius, paint)
+                
+                paint.style = Paint.Style.STROKE
+                paint.color = topColor
+                paint.alpha = alphaInt
+                paint.strokeWidth = 3f
+                canvas.drawCircle(btn.cx, btn.cy, btn.radius, paint)
+                
+                // Draw Crosshair / Target Icon
+                paint.style = Paint.Style.STROKE
+                paint.color = textColor
+                paint.strokeWidth = btn.radius * 0.12f
+                canvas.drawCircle(btn.cx, btn.cy, btn.radius * 0.45f, paint) // inner ring
+                canvas.drawLine(btn.cx, btn.cy - btn.radius * 0.75f, btn.cx, btn.cy - btn.radius * 0.25f, paint) // top tick
+                canvas.drawLine(btn.cx, btn.cy + btn.radius * 0.25f, btn.cx, btn.cy + btn.radius * 0.75f, paint) // bot tick
+                canvas.drawLine(btn.cx - btn.radius * 0.75f, btn.cy, btn.cx - btn.radius * 0.25f, btn.cy, paint) // left tick
+                canvas.drawLine(btn.cx + btn.radius * 0.25f, btn.cy, btn.cx + btn.radius * 0.75f, btn.cy, paint) // right tick
+                paint.style = Paint.Style.FILL
+                canvas.drawCircle(btn.cx, btn.cy, btn.radius * 0.1f, paint) // center dot
             } else if (btn.isDpad) {
                 drawDpadArrow(canvas, btn.name, btn.cx, btn.cy, btn.radius, baseColor, topColor, alphaInt)
             } else {
@@ -1098,7 +1210,7 @@ class GamepadView @JvmOverloads constructor(
                 paint.alpha = alphaInt
                 canvas.drawPath(path, paint)
                 paint.strokeJoin = Paint.Join.MITER
-            } else if (!btn.isDpad) {
+            } else if (!btn.isDpad && btn.group != "Calibrate") {
                 paint.style = Paint.Style.FILL
                 paint.color = textColor
                 paint.alpha = alphaInt
@@ -1214,7 +1326,7 @@ class GamepadView @JvmOverloads constructor(
             canvas.drawLine(cx, cy - radius, cx, cy + radius, paint)
             
             paint.style = Paint.Style.FILL
-            paint.color = Color.parseColor("#8A2BE2")
+            paint.color = ThemeConfig.primaryColor
             paint.alpha = 255
             canvas.drawCircle(cx + gyroTiltX * radius, cy + gyroTiltY * radius, radius * 0.2f, paint)
             
@@ -1237,7 +1349,7 @@ class GamepadView @JvmOverloads constructor(
 
     private fun drawJoystick(canvas: Canvas, joy: Joystick, config: ButtonConfig) {
         if (isEditMode && draggingGroup == joy.group) {
-            paint.color = Color.parseColor("#8A2BE2")
+            paint.color = ThemeConfig.primaryColor
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 4f
             val pathEffect = DashPathEffect(floatArrayOf(20f, 20f), 0f)
@@ -1263,14 +1375,14 @@ class GamepadView @JvmOverloads constructor(
         canvas.drawCircle(joy.cx, joy.cy, joy.radius * 0.6f, paint)
 
         // Outer base border
-        paint.color = if (isActive) Color.parseColor("#45A29E") else GamepadColors.neutralTop
+        paint.color = if (isActive) ThemeConfig.primaryColor else GamepadColors.neutralTop
         paint.alpha = alphaInt
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4f
         canvas.drawCircle(joy.cx, joy.cy, joy.radius, paint)
         
         // Knob base
-        paint.color = if (isActive) Color.parseColor("#8A2BE2") else GamepadColors.neutralTop
+        paint.color = if (isActive) ThemeConfig.primaryColor else GamepadColors.neutralTop
         paint.alpha = alphaInt
         paint.style = Paint.Style.FILL
         canvas.drawCircle(joy.knobX, joy.knobY, joy.radius * 0.45f, paint)

@@ -67,8 +67,10 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
     private var isRunning = false
     private var thread: Thread? = null
 
+    val stateLock = Any()
     val state = ControllerState()
     private val lastSentState = ControllerState()
+    private val snapshotState = ControllerState() // For thread-safe reading
     // Fix 5: class-level ByteBuffer to avoid re-allocating each send
     private val sendBuf: ByteBuffer = ByteBuffer.allocate(41).also { it.order(ByteOrder.BIG_ENDIAN) }
     
@@ -154,52 +156,62 @@ class UdpSender(private val pcIp: String, private val port: Int, private val vib
                 while (isRunning) {
                     val now = System.currentTimeMillis()
 
-                    // If we haven't heard from the server in 10 seconds, drop the connection
-                    if (now - lastRecvTime.get() > 10000) {
+                    // If we haven't heard from the server in 15 seconds, drop the connection
+                    val timeSinceLastReceive = now - lastRecvTime.get()
+                    if (timeSinceLastReceive > 15000) {
                         onDisconnect?.invoke()
                         break
                     }
 
                     // Keep the server's PONG liveness reply flowing (the server no longer sends its own PING)
-                    if (now - lastPingTime > 2000) {
+                    // If we are over 10s without reply, ping aggressively (every 500ms) to try and recover
+                    val pingInterval = if (timeSinceLastReceive > 10000) 500 else 2000
+                    if (now - lastPingTime > pingInterval) {
                         try { socket?.send(DatagramPacket(pingPacket, pingPacket.size, address, port)) } catch (_: Exception) {}
                         lastPingTime = now
                     }
 
-                    val stateChanged = !state.equalsExceptSeq(lastSentState)
-                    // Fix 6: suppress heartbeats when paused (still send PING above for keepalive)
+                    val stateChanged: Boolean
                     val heartbeatDue = !isPaused && (now - lastSendTime) > 300
+
+                    synchronized(stateLock) {
+                        snapshotState.copyFrom(state)
+                    }
+
+                    stateChanged = !snapshotState.equalsExceptSeq(lastSentState)
 
                     if (stateChanged || heartbeatDue) {
                         sendBuf.clear()
                         sendBuf.put(1.toByte()) // version
-                        sendBuf.putShort(state.seq.toShort())
-                        sendBuf.putShort(state.buttons.toShort())
-                        sendBuf.putShort(state.lx)
-                        sendBuf.putShort(state.ly)
-                        sendBuf.putShort(state.rx)
-                        sendBuf.putShort(state.ry)
-                        sendBuf.put(state.lt)
-                        sendBuf.put(state.rt)
-                        sendBuf.putFloat(state.accelX)
-                        sendBuf.putFloat(state.accelY)
-                        sendBuf.putFloat(state.accelZ)
-                        sendBuf.putFloat(state.gyroX)
-                        sendBuf.putFloat(state.gyroY)
-                        sendBuf.putFloat(state.gyroZ)
+                        sendBuf.putShort(snapshotState.seq.toShort())
+                        sendBuf.putShort(snapshotState.buttons.toShort())
+                        sendBuf.putShort(snapshotState.lx)
+                        sendBuf.putShort(snapshotState.ly)
+                        sendBuf.putShort(snapshotState.rx)
+                        sendBuf.putShort(snapshotState.ry)
+                        sendBuf.put(snapshotState.lt)
+                        sendBuf.put(snapshotState.rt)
+                        sendBuf.putFloat(snapshotState.accelX)
+                        sendBuf.putFloat(snapshotState.accelY)
+                        sendBuf.putFloat(snapshotState.accelZ)
+                        sendBuf.putFloat(snapshotState.gyroX)
+                        sendBuf.putFloat(snapshotState.gyroY)
+                        sendBuf.putFloat(snapshotState.gyroZ)
                         // Joy-Con metadata (2 bytes) — keeps the server's offset stable at data.Length >= 41
-                        sendBuf.put(state.joyconType)
-                        sendBuf.put(state.battery)
+                        sendBuf.put(snapshotState.joyconType)
+                        sendBuf.put(snapshotState.battery)
 
                         val data = sendBuf.array()
                         val packet = DatagramPacket(data, data.size, address, port)
                         socket?.send(packet)
 
-                        lastSentState.copyFrom(state)
+                        lastSentState.copyFrom(snapshotState)
                         lastSendTime = now
 
-                        state.seq++
-                        if (state.seq > 65535) state.seq = 0
+                        synchronized(stateLock) {
+                            state.seq++
+                            if (state.seq > 65535) state.seq = 0
+                        }
                     }
 
                     Thread.sleep(16)

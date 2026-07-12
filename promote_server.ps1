@@ -6,7 +6,7 @@ $stableDir = "$serverDir/builds/stable"
 $backupDir = "$serverDir/builds/backup"
 $experimentalDir = "$serverDir/builds/experimental"
 
-Write-Host "--- NativeGamepad Server Build Promotion ---" -ForegroundColor Cyan
+Write-Host "--- Nyxx Server Build Promotion ---" -ForegroundColor Cyan
 
 # 1. Clear out the old Backup
 if (Test-Path $backupDir) {

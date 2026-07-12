@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_home_gradient">
@@ -19,26 +20,7 @@
         app:layout_constraintTop_toTopOf="parent"
         android:contentDescription="Go Back" />
 
-    <!-- Ambient Glow / Background decoration -->
-    <View
-        android:layout_width="400dp"
-        android:layout_height="400dp"
-        android:background="@drawable/glow_circle_cyan"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:translationX="100dp"
-        android:translationY="-100dp"
-        android:alpha="0.2"/>
-
-    <View
-        android:layout_width="500dp"
-        android:layout_height="500dp"
-        android:background="@drawable/glow_circle_purple"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:translationX="-150dp"
-        android:translationY="150dp"
-        android:alpha="0.15"/>
+    <!-- Ambient Glow / Background decoration removed for monochrome look -->
 
     <!-- Main Container (No ScrollView, centered) -->
     <LinearLayout
@@ -49,6 +31,7 @@
         android:padding="16dp">
 
         <TextView
+            android:id="@+id/tvNyxx"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Nyxx"
@@ -63,6 +46,7 @@
             android:layout_marginBottom="4dp" />
 
         <TextView
+            android:id="@+id/tvSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="WI-FI CONNECTION"
@@ -91,48 +75,69 @@
                 android:letterSpacing="0.1"
                 android:layout_marginBottom="16dp" />
 
-            <EditText
-                android:id="@+id/ipInput"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:background="@drawable/input_bg"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#45A29E"
-                android:fontFamily="monospace"
-                android:hint="Manual IP (e.g. 192.168.1.5)"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:textSize="16sp"
-                android:layout_marginBottom="16dp"
-                android:inputType="textUri" />
+            <!-- Live Auto-Discovery Status -->
+            <TextView
+                android:id="@+id/tvDiscoveryStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Searching for available servers..."
+                android:textColor="#9E9BB1"
+                android:textSize="14sp"
+                android:layout_marginBottom="12dp"
+                android:layout_gravity="center_horizontal" />
 
-            <!-- Row for Connect and QR Scan to save vertical space -->
+            <!-- List of discovered servers -->
             <LinearLayout
+                android:id="@+id/llDiscoveredServers"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="16dp">
+                android:orientation="vertical"
+                android:layout_marginBottom="8dp" />
 
-                <Button
-                    android:id="@+id/btnScanQr"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+            <!-- Connect Manually Toggle Link -->
+            <TextView
+                android:id="@+id/btnConnectManually"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Connect Manually"
+                android:textColor="#C5C6C7"
+                android:textSize="14sp"
+                android:layout_gravity="center_horizontal"
+                android:padding="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Collapsible Manual Input Layout -->
+            <LinearLayout
+                android:id="@+id/layoutManualInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/ipInput"
+                    android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/btn_premium_card"
-                    android:textColor="#E0E0E0"
-                    android:fontFamily="sans-serif-medium"
+                    android:background="@drawable/input_bg"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#45A29E"
+                    android:fontFamily="monospace"
+                    android:hint="Manual IP (e.g. 192.168.1.5)"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
                     android:textSize="16sp"
-                    android:text="SCAN QR" />
+                    android:layout_marginBottom="16dp"
+                    android:inputType="textUri" />
 
                 <Button
                     android:id="@+id/connectButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+                    android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:layout_marginStart="8dp"
                     android:background="@drawable/btn_premium_card"
-                    android:textColor="#8A2BE2"
+                    android:textColor="#FFFFFF"
                     android:fontFamily="sans-serif-bold"
                     android:textSize="16sp"
                     android:text="CONNECT" />
@@ -141,5 +146,16 @@
 
         </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvAppVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:textColor="#888888"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

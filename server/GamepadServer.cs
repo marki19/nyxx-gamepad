@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
+using Nefarius.ViGEm.Client.Targets.DualShock4;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
@@ -54,9 +55,11 @@ namespace NativeGamepadServer
         public string Message { get; set; } = string.Empty;
     }
 
+    public enum ControllerType { Xbox360, DualShock4 }
+
     public class ClientState
     {
-        public IXbox360Controller? Controller { get; set; }
+        public IVirtualGamepad? Controller { get; set; }
         public DateTime LastPacket { get; set; }
         public int PlayerIndex { get; set; }
         public float[] SmoothedGyro { get; } = new float[3];
@@ -65,6 +68,8 @@ namespace NativeGamepadServer
 
     public class GamepadServer
     {
+        public ControllerType SelectedControllerType { get; set; } = ControllerType.Xbox360;
+        
         private ViGEmClient? client;
         private CemuhookServer? cemuhook;
         private ConcurrentDictionary<IPEndPoint, ClientState> clients = new ConcurrentDictionary<IPEndPoint, ClientState>();
@@ -255,16 +260,16 @@ namespace NativeGamepadServer
                     else if (idleTime > 500)
                     {
                         var c = kvp.Value.Controller;
-                        if (c != null)
+                        if (c is IXbox360Controller x360)
                         {
                             try {
-                                c.SetAxisValue(Xbox360Axis.LeftThumbX, 0);
-                                c.SetAxisValue(Xbox360Axis.LeftThumbY, 0);
-                                c.SetAxisValue(Xbox360Axis.RightThumbX, 0);
-                                c.SetAxisValue(Xbox360Axis.RightThumbY, 0);
-                                c.SetSliderValue(Xbox360Slider.LeftTrigger, 0);
-                                c.SetSliderValue(Xbox360Slider.RightTrigger, 0);
-                                c.SubmitReport();
+                                x360.SetAxisValue(Xbox360Axis.LeftThumbX, 0);
+                                x360.SetAxisValue(Xbox360Axis.LeftThumbY, 0);
+                                x360.SetAxisValue(Xbox360Axis.RightThumbX, 0);
+                                x360.SetAxisValue(Xbox360Axis.RightThumbY, 0);
+                                x360.SetSliderValue(Xbox360Slider.LeftTrigger, 0);
+                                x360.SetSliderValue(Xbox360Slider.RightTrigger, 0);
+                                x360.SubmitReport();
                             } catch { }
                         }
                     }
@@ -361,21 +366,40 @@ namespace NativeGamepadServer
                         var vigem = client;
                         // Windows/ViGEmBus only supports 4 XInput pads. Players 5-8 are
                         // DSU-only (emulator motion via Cemuhook) and intentionally get a null controller.
-                        IXbox360Controller? newController = null;
+                        IVirtualGamepad? newController = null;
                         if (vigem != null && newPlayerIndex <= 4)
                         {
                             try {
-                                newController = vigem.CreateXbox360Controller();
-                                newController.Connect();
+                                if (SelectedControllerType == ControllerType.Xbox360)
+                                {
+                                    var newX360 = vigem.CreateXbox360Controller();
+                                    newController = newX360;
+                                    newX360.Connect();
 
-                                var rumbleEp = new IPEndPoint(remoteEP.Address, remoteEP.Port);
-                                byte[] rumbleScratch = new byte[24];
-                                newController.FeedbackReceived += (sender, args) => {
-                                    try {
-                                        int len = EncodeRumble(rumbleScratch, args.LargeMotor, args.SmallMotor);
-                                        udp?.Send(rumbleScratch, len, rumbleEp);
-                                    } catch { }
-                                };
+                                    var rumbleEp = new IPEndPoint(remoteEP.Address, remoteEP.Port);
+                                    byte[] rumbleScratch = new byte[24];
+                                    newX360.FeedbackReceived += (sender, args) => {
+                                        try {
+                                            int len = EncodeRumble(rumbleScratch, args.LargeMotor, args.SmallMotor);
+                                            udp?.Send(rumbleScratch, len, rumbleEp);
+                                        } catch { }
+                                    };
+                                }
+                                else if (SelectedControllerType == ControllerType.DualShock4)
+                                {
+                                    var newDs4 = vigem.CreateDualShock4Controller();
+                                    newController = newDs4;
+                                    newDs4.Connect();
+
+                                    var rumbleEp = new IPEndPoint(remoteEP.Address, remoteEP.Port);
+                                    byte[] rumbleScratch = new byte[24];
+                                    newDs4.FeedbackReceived += (sender, args) => {
+                                        try {
+                                            int len = EncodeRumble(rumbleScratch, args.LargeMotor, args.SmallMotor);
+                                            udp?.Send(rumbleScratch, len, rumbleEp);
+                                        } catch { }
+                                    };
+                                }
                             } catch (Exception ex) {
                                 Log($"ViGEm connection failed for Player {newPlayerIndex}: {ex.Message}. Falling back to DSU-only.");
                                 newController = null;
@@ -447,31 +471,74 @@ namespace NativeGamepadServer
                     }
 
                     var c = clientState.Controller;
-                    if (c != null) {
-                        c.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
-                        c.SetAxisValue(Xbox360Axis.LeftThumbY, ly);
-                        c.SetAxisValue(Xbox360Axis.RightThumbX, rx);
-                        c.SetAxisValue(Xbox360Axis.RightThumbY, ry);
-                        c.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
-                        c.SetSliderValue(Xbox360Slider.RightTrigger, rt);
+                    if (c is IXbox360Controller x360) {
+                        x360.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
+                        x360.SetAxisValue(Xbox360Axis.LeftThumbY, ly);
+                        x360.SetAxisValue(Xbox360Axis.RightThumbX, rx);
+                        x360.SetAxisValue(Xbox360Axis.RightThumbY, ry);
+                        x360.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
+                        x360.SetSliderValue(Xbox360Slider.RightTrigger, rt);
 
-                        c.SetButtonState(Xbox360Button.Up, (buttons & 0x0001) != 0);
-                        c.SetButtonState(Xbox360Button.Down, (buttons & 0x0002) != 0);
-                        c.SetButtonState(Xbox360Button.Left, (buttons & 0x0004) != 0);
-                        c.SetButtonState(Xbox360Button.Right, (buttons & 0x0008) != 0);
-                        c.SetButtonState(Xbox360Button.Start, (buttons & 0x0010) != 0);
-                        c.SetButtonState(Xbox360Button.Back, (buttons & 0x0020) != 0);
-                        c.SetButtonState(Xbox360Button.LeftThumb, (buttons & 0x0040) != 0);
-                        c.SetButtonState(Xbox360Button.RightThumb, (buttons & 0x0080) != 0);
-                        c.SetButtonState(Xbox360Button.LeftShoulder, (buttons & 0x0100) != 0);
-                        c.SetButtonState(Xbox360Button.RightShoulder, (buttons & 0x0200) != 0);
-                        c.SetButtonState(Xbox360Button.Guide, (buttons & 0x0400) != 0);
-                        c.SetButtonState(Xbox360Button.A, (buttons & 0x1000) != 0);
-                        c.SetButtonState(Xbox360Button.B, (buttons & 0x2000) != 0);
-                        c.SetButtonState(Xbox360Button.X, (buttons & 0x4000) != 0);
-                        c.SetButtonState(Xbox360Button.Y, (buttons & 0x8000) != 0);
+                        x360.SetButtonState(Xbox360Button.Up, (buttons & 0x0001) != 0);
+                        x360.SetButtonState(Xbox360Button.Down, (buttons & 0x0002) != 0);
+                        x360.SetButtonState(Xbox360Button.Left, (buttons & 0x0004) != 0);
+                        x360.SetButtonState(Xbox360Button.Right, (buttons & 0x0008) != 0);
+                        x360.SetButtonState(Xbox360Button.Start, (buttons & 0x0010) != 0);
+                        x360.SetButtonState(Xbox360Button.Back, (buttons & 0x0020) != 0);
+                        x360.SetButtonState(Xbox360Button.LeftThumb, (buttons & 0x0040) != 0);
+                        x360.SetButtonState(Xbox360Button.RightThumb, (buttons & 0x0080) != 0);
+                        x360.SetButtonState(Xbox360Button.LeftShoulder, (buttons & 0x0100) != 0);
+                        x360.SetButtonState(Xbox360Button.RightShoulder, (buttons & 0x0200) != 0);
+                        x360.SetButtonState(Xbox360Button.Guide, (buttons & 0x0400) != 0);
+                        x360.SetButtonState(Xbox360Button.A, (buttons & 0x1000) != 0);
+                        x360.SetButtonState(Xbox360Button.B, (buttons & 0x2000) != 0);
+                        x360.SetButtonState(Xbox360Button.X, (buttons & 0x4000) != 0);
+                        x360.SetButtonState(Xbox360Button.Y, (buttons & 0x8000) != 0);
 
-                        c.SubmitReport();
+                        x360.SubmitReport();
+                    } else if (c is IDualShock4Controller ds4) {
+                        ds4.SetAxisValue(DualShock4Axis.LeftThumbX, (byte)((lx + 32768) / 256));
+                        ds4.SetAxisValue(DualShock4Axis.LeftThumbY, (byte)((~ly + 32768) / 256)); // DS4 Y is inverted
+                        ds4.SetAxisValue(DualShock4Axis.RightThumbX, (byte)((rx + 32768) / 256));
+                        ds4.SetAxisValue(DualShock4Axis.RightThumbY, (byte)((~ry + 32768) / 256)); // DS4 Y is inverted
+                        ds4.SetSliderValue(DualShock4Slider.LeftTrigger, lt);
+                        ds4.SetSliderValue(DualShock4Slider.RightTrigger, rt);
+
+                        ds4.SetButtonState(DualShock4Button.Square, (buttons & 0x4000) != 0); // X = Square
+                        ds4.SetButtonState(DualShock4Button.Cross, (buttons & 0x1000) != 0); // A = Cross
+                        ds4.SetButtonState(DualShock4Button.Circle, (buttons & 0x2000) != 0); // B = Circle
+                        ds4.SetButtonState(DualShock4Button.Triangle, (buttons & 0x8000) != 0); // Y = Triangle
+                        
+                        ds4.SetButtonState(DualShock4Button.ShoulderLeft, (buttons & 0x0100) != 0);
+                        ds4.SetButtonState(DualShock4Button.ShoulderRight, (buttons & 0x0200) != 0);
+                        ds4.SetButtonState(DualShock4Button.TriggerLeft, lt > 0);
+                        ds4.SetButtonState(DualShock4Button.TriggerRight, rt > 0);
+                        
+                        ds4.SetButtonState(DualShock4Button.Share, (buttons & 0x0020) != 0); // Back = Share
+                        ds4.SetButtonState(DualShock4Button.Options, (buttons & 0x0010) != 0); // Start = Options
+                        ds4.SetButtonState(DualShock4Button.ThumbLeft, (buttons & 0x0040) != 0);
+                        ds4.SetButtonState(DualShock4Button.ThumbRight, (buttons & 0x0080) != 0);
+                        ds4.SetButtonState(DualShock4SpecialButton.Ps, (buttons & 0x0400) != 0); // Guide = PS
+
+                        // D-Pad mapping
+                        bool up = (buttons & 0x0001) != 0;
+                        bool down = (buttons & 0x0002) != 0;
+                        bool left = (buttons & 0x0004) != 0;
+                        bool right = (buttons & 0x0008) != 0;
+
+                        DualShock4DPadDirection dpad = DualShock4DPadDirection.None;
+                        if (up && right) dpad = DualShock4DPadDirection.Northeast;
+                        else if (up && left) dpad = DualShock4DPadDirection.Northwest;
+                        else if (down && right) dpad = DualShock4DPadDirection.Southeast;
+                        else if (down && left) dpad = DualShock4DPadDirection.Southwest;
+                        else if (up) dpad = DualShock4DPadDirection.North;
+                        else if (down) dpad = DualShock4DPadDirection.South;
+                        else if (left) dpad = DualShock4DPadDirection.West;
+                        else if (right) dpad = DualShock4DPadDirection.East;
+                        
+                        ds4.SetDPadDirection(dpad);
+
+                        ds4.SubmitReport();
                     }
 
                     var stateArgs = new GamepadStateArgs {

@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -22,9 +23,7 @@ import android.widget.TextView
 
 class HomeActivity : AppCompatActivity() {
 
-    companion object {
-        var hasCheckedForUpdates = false
-    }
+
 
     private val discoverabilityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode != android.app.Activity.RESULT_CANCELED) {
@@ -37,7 +36,9 @@ class HomeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ThemeConfig.load(this)
         setContentView(R.layout.activity_home)
+        applyTheme()
 
         findViewById<TextView>(R.id.tvAppVersion).text = "v" + BuildConfig.VERSION_NAME
 
@@ -60,17 +61,23 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, FaqActivity::class.java))
         }
 
-        if (!hasCheckedForUpdates) {
-            hasCheckedForUpdates = true
+        // Theme Settings button
+        findViewById<View>(R.id.btnThemeSettings).setOnClickListener {
+            ThemeSettingsDialog(this) {
+                applyTheme()
+            }.show()
+        }
+
+        val prefs = getSharedPreferences("GamepadPrefs", MODE_PRIVATE)
+        val lastCheck = prefs.getLong("last_update_check", 0L)
+        val now = System.currentTimeMillis()
+        if (now - lastCheck > 12 * 60 * 60 * 1000L) { // 12 hours
+            prefs.edit().putLong("last_update_check", now).apply()
             checkForUpdates()
         }
 
         val wifiButton = findViewById<Button>(R.id.btnConnectWifi)
         wifiButton.setOnClickListener { showWifiOneTimeTip() }
-
-        findViewById<Button>(R.id.btnConnectHotspot).setOnClickListener {
-            showHotspotInstructions()
-        }
 
         findViewById<Button>(R.id.btnConnectUsb).setOnClickListener {
             // Explain USB Tethering
@@ -117,26 +124,11 @@ class HomeActivity : AppCompatActivity() {
             return
         }
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("Wi-Fi Mode")
-            .setMessage("Connect your phone and PC to the SAME Wi-Fi network.\n\nThen start the Nyxx Server on your PC and scan the QR code (or type the PC's IP and port).\n\nNo internet connection is required — only a shared local network.")
+            .setTitle("Wi-Fi / Hotspot Mode")
+            .setMessage("Connect your phone and PC to the SAME local network (Wi-Fi router or phone/PC hotspot).\n\nThen start the Nyxx Server on your PC. The app will automatically scan and detect the server, or you can enter the PC's IP address manually.")
             .setPositiveButton("Got it") { _, _ ->
                 prefs.edit().putBoolean("wifi_tip_shown", true).apply()
                 startWifi()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    // Hotspot mode: explain how to create a private local network, then connect.
-    private fun showHotspotInstructions() {
-        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("Hotspot Mode")
-            .setMessage("1. On your phone, turn on the Mobile Hotspot.\n2. On your PC, connect to that hotspot's Wi-Fi.\n3. Start the Nyxx Server on your PC — it will show its hotspot IP.\n4. Tap 'Continue' below, then scan the QR code or enter the PC IP.\n\nThis creates a private local network. No internet is needed. (You can also use a PC hotspot with your phone connected instead.)")
-            .setPositiveButton("Continue to Connect") { _, _ ->
-                val intent = Intent(this, MainActivity::class.java)
-                intent.putExtra("CONNECTION_MODE", "WIFI")
-                startActivity(intent)
-                finish()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -177,7 +169,7 @@ class HomeActivity : AppCompatActivity() {
                                     val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl))
                                     startActivity(browserIntent)
                                 }
-                                .setNegativeButton("Later", null)
+                                .setNegativeButton("Skip") { _, _ -> }
                                 .show()
                         }
                     }
@@ -186,6 +178,38 @@ class HomeActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun applyTheme() {
+        val rootLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.rootLayout)
+        if (rootLayout == null) {
+            window.decorView.setBackgroundColor(ThemeConfig.backgroundColor)
+        } else {
+            rootLayout.setBackgroundColor(ThemeConfig.backgroundColor)
+        }
+        val tvNyxx = findViewById<TextView>(R.id.tvNyxx)
+        val tvSubtitle = findViewById<TextView>(R.id.tvSubtitle)
+        val tvFaqIcon = findViewById<TextView>(R.id.tvFaqIcon)
+        val tvThemeIcon = findViewById<TextView>(R.id.tvThemeIcon)
+        val btnWifi = findViewById<Button>(R.id.btnConnectWifi)
+        val btnUsb = findViewById<Button>(R.id.btnConnectUsb)
+        val btnBluetooth = findViewById<Button>(R.id.btnConnectBluetooth)
+
+        val pColor = ThemeConfig.primaryColor
+        
+        // Brand text shadow color & subtitle color
+        tvNyxx?.setShadowLayer(12f, 0f, 4f, pColor)
+        tvSubtitle?.setTextColor(pColor)
+        
+        // FAQ and Theme circle backgrounds
+        tvFaqIcon?.backgroundTintList = android.content.res.ColorStateList.valueOf(pColor)
+        tvThemeIcon?.backgroundTintList = android.content.res.ColorStateList.valueOf(pColor)
+        
+        // Button Drawables Tint
+        val buttons = listOf(btnWifi, btnUsb, btnBluetooth)
+        for (btn in buttons) {
+            btn?.compoundDrawablesRelative?.get(0)?.setTint(pColor)
         }
     }
 }

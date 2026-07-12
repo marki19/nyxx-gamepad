@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <shape>
+            <solid android:color="#45A29E" />
+            <corners android:radius="8dp" />
+            <!-- Include a transparent stroke so the intrinsic sizing matches the 1.5dp stroke of the outline button -->
+            <stroke android:width="1.5dp" android:color="#00000000" />
+        </shape>
+    </item>
+</ripple>

@@ -1,30 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_home_gradient">
-
-    <!-- Ambient Glow / Background decoration -->
-    <View
-        android:layout_width="400dp"
-        android:layout_height="400dp"
-        android:background="@drawable/glow_circle_cyan"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:translationX="100dp"
-        android:translationY="-100dp"
-        android:alpha="0.25"/>
-
-    <View
-        android:layout_width="500dp"
-        android:layout_height="500dp"
-        android:background="@drawable/glow_circle_purple"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:translationX="-150dp"
-        android:translationY="150dp"
-        android:alpha="0.2"/>
+    android:background="#121212">
 
     <!-- Main Container (centered) -->
     <LinearLayout
@@ -58,6 +38,7 @@
                 android:orientation="vertical">
                 
                 <TextView
+                    android:id="@+id/tvNyxx"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Nyxx"
@@ -71,6 +52,7 @@
                     android:shadowRadius="12.0" />
                     
                 <TextView
+                    android:id="@+id/tvSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ULTIMATE VIRTUAL CONTROLLER"
@@ -104,24 +86,8 @@
                 android:id="@+id/btnConnectWifi"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
-                android:text="Wi-Fi (Local Network)"
+                android:text="Wi-Fi / Hotspot (Local Network)"
                 android:drawableStart="@drawable/ic_wifi"
-                android:paddingStart="24dp"
-                android:paddingEnd="24dp"
-                android:drawablePadding="16dp"
-                android:gravity="center_vertical|start"
-                android:background="@drawable/btn_premium_card"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:fontFamily="sans-serif-medium"
-                android:layout_marginBottom="16dp" />
-
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/btnConnectHotspot"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:text="Hotspot (Phone / PC Hotspot)"
-                android:drawableStart="@drawable/ic_hotspot"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
                 android:drawablePadding="16dp"
@@ -184,6 +150,7 @@
         android:layout_marginStart="12dp">
 
         <TextView
+            android:id="@+id/tvFaqIcon"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="@drawable/bg_circle_icon"
@@ -201,6 +168,41 @@
             android:textSize="14sp"
             android:fontFamily="sans-serif-medium"
             android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <!-- Theme Settings button - top-right -->
+    <LinearLayout
+        android:id="@+id/btnThemeSettings"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="THEME"
+            android:textColor="#C5C6C7"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/tvThemeIcon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_circle_icon"
+            android:text="🎨"
+            android:textSize="20sp"
+            android:gravity="center" />
     </LinearLayout>
 
     <TextView

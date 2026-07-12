@@ -16,9 +16,20 @@ class FaqActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ThemeConfig.load(this)
         setContentView(R.layout.activity_faq)
 
-        findViewById<ImageView>(R.id.btnFaqBack).setOnClickListener { finish() }
+        val btnBack = findViewById<ImageView>(R.id.btnFaqBack)
+        btnBack.setOnClickListener { finish() }
+        btnBack.setColorFilter(ThemeConfig.primaryColor)
+        
+        val rootLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.rootLayout)
+        // Override the XML gradient drawable with the user's chosen background color
+        rootLayout?.setBackgroundColor(ThemeConfig.backgroundColor)
+            ?: window.decorView.setBackgroundColor(ThemeConfig.backgroundColor)
+        
+        findViewById<TextView>(R.id.tvFaqTitle)?.setTextColor(ThemeConfig.primaryColor)
+        
         container = findViewById(R.id.faqContainer)
 
         buildContent()
@@ -33,7 +44,7 @@ class FaqActivity : AppCompatActivity() {
         )
         addQ(
             "What connection modes are available?",
-            "Four modes: Wi-Fi (shared router), Hotspot (phone or PC hotspot), Wired (USB tethering), and Bluetooth."
+            "Three modes: Wi-Fi / Hotspot (Local Network), Wired (USB tethering), and Bluetooth."
         )
         addQ(
             "Do I need a Wi-Fi router?",
@@ -55,12 +66,8 @@ class FaqActivity : AppCompatActivity() {
         // ---------- HOW TO CONNECT ----------
         addHeader("How to connect")
         addQ(
-            "Wi-Fi mode",
-            "1) Connect your phone and PC to the same Wi-Fi router.\n2) Start the Nyxx Server on your PC.\n3) On your phone tap Wi-Fi, then scan the QR code on the server (or type the PC IP and port).\nNo internet required."
-        )
-        addQ(
-            "Hotspot mode",
-            "1) On your phone, turn on the Mobile Hotspot.\n2) On your PC, connect to that hotspot's Wi-Fi.\n3) Start the Nyxx Server - it shows its hotspot IP.\n4) On your phone tap Hotspot, then scan the QR code or enter the PC IP.\nThis makes a private local network; no internet needed. (Reverse works too: PC hotspot + phone connects.)"
+            "Wi-Fi / Hotspot mode",
+            "1) Connect your phone and PC to the same local network (either a shared Wi-Fi router, a phone hotspot, or a PC hotspot).\n2) Start the Nyxx Server on your PC.\n3) On your phone, tap 'Wi-Fi / Hotspot', and the app will automatically search and display available servers for you to connect."
         )
         addQ(
             "Wired (USB) mode",
@@ -90,14 +97,13 @@ class FaqActivity : AppCompatActivity() {
         addHeader("Links & Credits")
         addLink("Source code (GitHub)", "https://github.com/marki19/nyxx-gamepad")
         addText("Developer: geyyb  (GitHub: @marki19)")
-        addLink("Buy me a coffee", "https://buymeacoffee.com/geyyb")
     }
 
     private fun addHeader(text: String) {
         val tv = TextView(this).apply {
             this.text = text
             textSize = 13f
-            setTextColor(0xFF8A2BE2.toInt())
+            setTextColor(ThemeConfig.primaryColor)
             letterSpacing = 0.12f
             setTypeface(null, android.graphics.Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(
@@ -157,7 +163,7 @@ class FaqActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = ContextCompat.getDrawable(this@FaqActivity, R.drawable.btn_primary_bg)
+            background = ContextCompat.getDrawable(this@FaqActivity, R.drawable.btn_premium_card)
             isClickable = true
             isFocusable = true
             layoutParams = LinearLayout.LayoutParams(

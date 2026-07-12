@@ -15,5 +15,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "NativeGamepad"
+rootProject.name = "Nyxx"
 include(":app")

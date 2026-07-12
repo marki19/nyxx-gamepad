@@ -8,7 +8,7 @@ $backupDir = "$appDir/builds/backup"
 $experimentalDir = "$appDir/builds/experimental"
 $apkPath = "$appDir/build/outputs/apk/debug/app-debug.apk"
 
-Write-Host "--- NativeGamepad Android Build Promotion ---" -ForegroundColor Cyan
+Write-Host "--- Nyxx Android Build Promotion ---" -ForegroundColor Cyan
 
 # 1. Clear out the old Backup
 if (Test-Path $backupDir) {

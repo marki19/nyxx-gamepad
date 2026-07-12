@@ -202,29 +202,29 @@ Next steps — choose one:
 (C) I will generate both (A) + (B) so you can build end-to-end and run immediately.
 Which do you want first?
 
-*Listed directory [NativeGamepad](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad) *
+*Listed directory [Nyxx](file:///c:/Programming%20Projects/personal%20projects/Nyxx) *
 
-*Listed directory [client](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client) *
+*Listed directory [client](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client) *
 
-*Listed directory [server](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/server) *
+*Listed directory [server](file:///c:/Programming%20Projects/personal%20projects/Nyxx/server) *
 
-*Viewed [Program.cs](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/server/Program.cs) *
+*Viewed [Program.cs](file:///c:/Programming%20Projects/personal%20projects/Nyxx/server/Program.cs) *
 
-*Viewed [GamepadView.kt](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad/GamepadView.kt) *
+*Viewed [GamepadView.kt](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx/GamepadView.kt) *
 
-*Listed directory [nativegamepad](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad) *
+*Listed directory [Nyxx](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx) *
 
-*Viewed [UdpSender.kt](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad/UdpSender.kt) *
+*Viewed [UdpSender.kt](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx/UdpSender.kt) *
 
-*Viewed [MainActivity.kt](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad/MainActivity.kt) *
+*Viewed [MainActivity.kt](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx/MainActivity.kt) *
 
-*Viewed [server.csproj](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/server/server.csproj) *
+*Viewed [server.csproj](file:///c:/Programming%20Projects/personal%20projects/Nyxx/server/server.csproj) *
 
-*Viewed [AndroidManifest.xml](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/AndroidManifest.xml) *
+*Viewed [AndroidManifest.xml](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/AndroidManifest.xml) *
 
-*Viewed [build.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/build.gradle.kts) *
+*Viewed [build.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/build.gradle.kts) *
 
-*Viewed [build.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/build.gradle.kts) *
+*Viewed [build.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/build.gradle.kts) *
 
 *Edited relevant file*
 
@@ -248,7 +248,7 @@ Please review the plan in the [implementation_plan.md](file:///C:/Users/mark/.ge
 
 *User accepted the command `.\gradlew.bat assembleDebug`*
 
-*Listed directory [client](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client) *
+*Listed directory [client](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client) *
 
 *User accepted the command `gradle --version`*
 
@@ -336,7 +336,7 @@ Your Android app will need to know where to send the gamepad inputs.
 ### 2. Build and Run the Android App
 Since we found earlier that the `gradle` build tools aren't in your command-line path, the easiest way to build the app is using Android Studio:
 1. Open **Android Studio**.
-2. Click **Open** and select the `client` folder: `C:\Programming Projects\personal projects\NativeGamepad\client`.
+2. Click **Open** and select the `client` folder: `C:\Programming Projects\personal projects\Nyxx\client`.
 3. Give it a minute or two to automatically download the necessary Gradle tools and sync the project.
 4. Plug in your Android phone to your PC via USB (ensure **USB Debugging** is enabled in your phone's Developer Options), or start up an Android Emulator.
 5. Click the green **Play (Run)** button at the top of Android Studio to install the app on your phone.
@@ -412,7 +412,7 @@ android studio install done
 Awesome! Now that Android Studio is installed, here are the final steps to get everything running:
 
 ### 1. Start the PC Server 
-Your previous terminal session seems to have closed, so let's get the server running again. Open a terminal in the `server` folder (`c:\Programming Projects\personal projects\NativeGamepad\server`) and run:
+Your previous terminal session seems to have closed, so let's get the server running again. Open a terminal in the `server` folder (`c:\Programming Projects\personal projects\Nyxx\server`) and run:
 ```powershell
 & "C:\Program Files\dotnet\dotnet.exe" run
 ```
@@ -420,7 +420,7 @@ It should say `"Initializing ViGEmBus client..."` and start listening.
 
 ### 2. Open the App in Android Studio
 1. Open **Android Studio**.
-2. Click **Open** (or File -> Open) and select the `client` folder: `C:\Programming Projects\personal projects\NativeGamepad\client`.
+2. Click **Open** (or File -> Open) and select the `client` folder: `C:\Programming Projects\personal projects\Nyxx\client`.
 3. Give it a minute to sync. In the bottom right corner, you might see it downloading Gradle and the SDK tools. Wait until the progress bar finishes.
 
 ### 3. Install on your Phone
@@ -496,9 +496,9 @@ no play button her, where??
 If the green Play button isn't showing up at the top of Android Studio, it usually means one of two things happened:
 
 ### 1. You opened the wrong folder
-Android Studio needs to open the **`client`** folder specifically, not the main `NativeGamepad` folder. 
+Android Studio needs to open the **`client`** folder specifically, not the main `Nyxx` folder. 
 * Look at the file tree on the left side of Android Studio. If you see the `server` folder in there alongside `client`, you've opened the wrong directory!
-* **To fix it:** Go to **File > Open**, navigate to `C:\Programming Projects\personal projects\NativeGamepad\client`, select exactly the `client` folder, and click OK.
+* **To fix it:** Go to **File > Open**, navigate to `C:\Programming Projects\personal projects\Nyxx\client`, select exactly the `client` folder, and click OK.
 
 ### 2. The project is still syncing
 When you first open an Android project, Android Studio has to download Gradle and all the Android tools in the background. 
@@ -522,7 +522,7 @@ Your project may be using a third-party plugin which is not compatible with the 
 
 In the case of corrupt Gradle processes, you can also try closing the IDE and then killing all Java processes.
 
-*Viewed [settings.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/settings.gradle.kts) *
+*Viewed [settings.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/settings.gradle.kts) *
 
 *Edited relevant file*
 
@@ -577,7 +577,7 @@ may help locating the currently used AGP version; this window will update once s
 
 *Edited relevant file*
 
-*Viewed [build.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/build.gradle.kts) *
+*Viewed [build.gradle.kts](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/build.gradle.kts) *
 
 ### Planner Response
 
@@ -704,34 +704,34 @@ Click the **Sync Project with Gradle Files** button (the little blue elephant ic
 
 ### User Input
 
-ERROR: C:\Programming Projects\personal projects\NativeGamepad\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.nativegamepad:mipmap/ic_launcher) not found.
+ERROR: C:\Programming Projects\personal projects\Nyxx\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.Nyxx:mipmap/ic_launcher) not found.
 
 > Task :app:processDebugResources FAILED
-AGPBI: {"kind":"error","text":"Android resource linking failed","sources":[{"file":"C:\\Programming Projects\\personal projects\\NativeGamepad\\client\\app\\src\\main\\AndroidManifest.xml","position":{"startLine":8,"startColumn":4,"endLine":26,"endColumn":18}}],"original":"ERROR: C:\\Programming Projects\\personal projects\\NativeGamepad\\client\\app\\src\\main\\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.nativegamepad:mipmap/ic_launcher) not found.\n    ","tool":"AAPT"}
-AGPBI: {"kind":"error","text":"Android resource linking failed","sources":[{"file":"C:\\Programming Projects\\personal projects\\NativeGamepad\\client\\app\\src\\main\\AndroidManifest.xml","position":{"startLine":8,"startColumn":4,"endLine":26,"endColumn":18}}],"original":"ERROR: C:\\Programming Projects\\personal projects\\NativeGamepad\\client\\app\\src\\main\\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.nativegamepad:mipmap/ic_launcher_round) not found.\n    ","tool":"AAPT"}
+AGPBI: {"kind":"error","text":"Android resource linking failed","sources":[{"file":"C:\\Programming Projects\\personal projects\\Nyxx\\client\\app\\src\\main\\AndroidManifest.xml","position":{"startLine":8,"startColumn":4,"endLine":26,"endColumn":18}}],"original":"ERROR: C:\\Programming Projects\\personal projects\\Nyxx\\client\\app\\src\\main\\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.Nyxx:mipmap/ic_launcher) not found.\n    ","tool":"AAPT"}
+AGPBI: {"kind":"error","text":"Android resource linking failed","sources":[{"file":"C:\\Programming Projects\\personal projects\\Nyxx\\client\\app\\src\\main\\AndroidManifest.xml","position":{"startLine":8,"startColumn":4,"endLine":26,"endColumn":18}}],"original":"ERROR: C:\\Programming Projects\\personal projects\\Nyxx\\client\\app\\src\\main\\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.Nyxx:mipmap/ic_launcher_round) not found.\n    ","tool":"AAPT"}
 
 
 
-ERROR: C:\Programming Projects\personal projects\NativeGamepad\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.nativegamepad:mipmap/ic_launcher) not found.
+ERROR: C:\Programming Projects\personal projects\Nyxx\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.Nyxx:mipmap/ic_launcher) not found.
 Fix with AI
 
-ERROR: C:\Programming Projects\personal projects\NativeGamepad\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.nativegamepad:mipmap/ic_launcher_round) not found.
+ERROR: C:\Programming Projects\personal projects\Nyxx\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.Nyxx:mipmap/ic_launcher_round) not found.
 Fix with AI
 
 
 
-ERROR: C:\Programming Projects\personal projects\NativeGamepad\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.nativegamepad:mipmap/ic_launcher_round) not found.
+ERROR: C:\Programming Projects\personal projects\Nyxx\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.Nyxx:mipmap/ic_launcher_round) not found.
 Fix with AI
 
 
 Android resource linking failed
-ERROR: C:\Programming Projects\personal projects\NativeGamepad\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.nativegamepad:mipmap/ic_launcher) not found.
+ERROR: C:\Programming Projects\personal projects\Nyxx\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher (aka com.Nyxx:mipmap/ic_launcher) not found.
     
-ERROR: C:\Programming Projects\personal projects\NativeGamepad\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.nativegamepad:mipmap/ic_launcher_round) not found.
+ERROR: C:\Programming Projects\personal projects\Nyxx\client\app\src\main\AndroidManifest.xml:9:5-27:19: AAPT: error: resource mipmap/ic_launcher_round (aka com.Nyxx:mipmap/ic_launcher_round) not found.
     
 
 
-*Viewed [AndroidManifest.xml](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/AndroidManifest.xml) *
+*Viewed [AndroidManifest.xml](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/AndroidManifest.xml) *
 
 *Edited relevant file*
 
@@ -751,7 +751,7 @@ the controls are not nintendo console like.
 
 also i tested on joy.cpl and joystick dont have input
 
-*Viewed [GamepadView.kt](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad/GamepadView.kt) *
+*Viewed [GamepadView.kt](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx/GamepadView.kt) *
 
 *Edited relevant file*
 
@@ -769,7 +769,7 @@ Please review the [implementation_plan.md](file:///C:/Users/mark/.gemini/antigra
 
 *Edited relevant file*
 
-*Viewed [MainActivity.kt](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad/MainActivity.kt) *
+*Viewed [MainActivity.kt](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx/MainActivity.kt) *
 
 *Edited relevant file*
 
@@ -795,7 +795,7 @@ Once connected, check your PC's terminal when you move the joystick—those logs
 
 ### User Input
 
-PS C:\Programming Projects\personal projects\NativeGamepad\server> dot net run
+PS C:\Programming Projects\personal projects\Nyxx\server> dot net run
 dot: The term 'dot' is not recognized as a name of a cmdlet, function, script file, or executable program.
 Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
 
@@ -835,9 +835,9 @@ also the XYAB buttons are inputting invert. the A inputs as B, the X inputs as Y
 
 
 
-*Viewed [Program.cs](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/server/Program.cs) *
+*Viewed [Program.cs](file:///c:/Programming%20Projects/personal%20projects/Nyxx/server/Program.cs) *
 
-*Viewed [UdpSender.kt](file:///c:/Programming%20Projects/personal%20projects/NativeGamepad/client/app/src/main/java/com/nativegamepad/UdpSender.kt) *
+*Viewed [UdpSender.kt](file:///c:/Programming%20Projects/personal%20projects/Nyxx/client/app/src/main/java/com/Nyxx/UdpSender.kt) *
 
 *Edited relevant file*
 

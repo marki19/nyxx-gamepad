@@ -5,12 +5,14 @@ import android.content.pm.ActivityInfo
 import androidx.activity.OnBackPressedCallback
 import android.os.Bundle
 import android.os.BatteryManager
-import android.view.MotionEvent
+
 import android.view.View
+import android.view.MotionEvent
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Spinner
@@ -21,7 +23,6 @@ import android.widget.Toast
 import android.app.AlertDialog
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import androidx.core.view.GravityCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -73,6 +74,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ThemeConfig.load(this)
         
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -85,9 +87,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val panel = findViewById<LinearLayout>(R.id.panelEditProperties)
-                if (panel?.visibility == View.VISIBLE) {
-                    panel.visibility = View.GONE
+                val isInEditMode = gamepadView?.isEditMode == true
+                if (isInEditMode) {
+                    // Let saveEditMode() -> onEditModeExited handle all dismissal animations
                     gamepadView?.saveEditMode()
                     return
                 }
@@ -105,7 +107,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         })
         
-        val mode = intent?.getStringExtra("CONNECTION_MODE")
+        val mode = intent?.getStringExtra("CONNECTION_MODE") ?: "WIFI"
         if (mode == "BLUETOOTH") {
             startBluetoothGamepad()
         } else {
@@ -125,71 +127,68 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     @android.annotation.SuppressLint("SetTextI18n")
+    private fun applyTheme() {
+        val rootLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.rootLayout)
+        if (rootLayout == null) {
+            // Set id in layout or just use window decor view
+            window.decorView.setBackgroundColor(ThemeConfig.backgroundColor)
+        } else {
+            rootLayout.setBackgroundColor(ThemeConfig.backgroundColor)
+        }
+
+        val tvNyxx = findViewById<TextView>(R.id.tvNyxx)
+        val tvSubtitle = findViewById<TextView>(R.id.tvSubtitle)
+        val btnConnect = findViewById<Button>(R.id.connectButton)
+        val btnBackToHome = findViewById<android.widget.ImageButton>(R.id.btnBackToHome)
+
+        val pColor = ThemeConfig.primaryColor
+        
+        tvNyxx?.setShadowLayer(12f, 0f, 4f, pColor)
+        tvSubtitle?.setTextColor(pColor)
+        btnConnect?.setTextColor(pColor)
+        btnBackToHome?.setColorFilter(pColor)
+    }
+
     private fun setupHomePage() {
         setContentView(R.layout.activity_main)
 
         val input = findViewById<EditText>(R.id.ipInput)
         val button = findViewById<Button>(R.id.connectButton)
-        val btnScanQr = findViewById<Button>(R.id.btnScanQr)
+        val tvDiscoveryStatus = findViewById<TextView>(R.id.tvDiscoveryStatus)
+        val llDiscoveredServers = findViewById<LinearLayout>(R.id.llDiscoveredServers)
+        val btnConnectManually = findViewById<TextView>(R.id.btnConnectManually)
+        val layoutManualInput = findViewById<LinearLayout>(R.id.layoutManualInput)
+        
+        applyTheme()
+        findViewById<TextView>(R.id.tvAppVersion)?.text = "v" + BuildConfig.VERSION_NAME
 
         val prefs = getSharedPreferences("GamepadPrefs", Context.MODE_PRIVATE)
-        val autoIp = intent?.getStringExtra("AUTO_CONNECT_IP")
-        if (!autoIp.isNullOrBlank()) {
-            input.setText(autoIp)
-            button.performClick()
-        } else {
-            input.setText(prefs.getString("last_ip", ""))
-            
-            // Start UDP Auto-Discovery scanner
-            discoveryJob?.cancel()
-            discoveryJob = lifecycleScope.launch(Dispatchers.IO) {
-                var socket: DatagramSocket? = null
-                try {
-                    socket = DatagramSocket()
-                    socket.broadcast = true
-                    socket.soTimeout = 2000
-                    
-                    val broadcastAddress = InetAddress.getByName("255.255.255.255")
-                    val sendData = "Nyxx_DISCOVER".toByteArray()
-                    val receiveData = ByteArray(1024)
-                    
-                    while (isActive) {
-                        try {
-                            val sendPacket = DatagramPacket(sendData, sendData.size, broadcastAddress, 55555)
-                            socket.send(sendPacket)
-                            
-                            val receivePacket = DatagramPacket(receiveData, receiveData.size)
-                            socket.receive(receivePacket)
-                            val message = String(receivePacket.data, 0, receivePacket.length)
-                            
-                            if (message.startsWith("Nyxx_SERVER:")) {
-                                val port = message.substringAfter("Nyxx_SERVER:")
-                                val ip = receivePacket.address.hostAddress
-                                
-                                runOnUiThread {
-                                    input.setText(getString(R.string.ip_port_format, ip, port.toString()))
-                                }
-                                break
-                            }
-                            
-                            kotlinx.coroutines.delay(1000)
-                        } catch (_: java.net.SocketTimeoutException) {
-                            // Ignore timeout
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            kotlinx.coroutines.delay(1000)
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    socket?.close()
-                }
-            }
+
+        btnConnectManually?.setOnClickListener {
+            layoutManualInput?.visibility = View.VISIBLE
+            btnConnectManually?.visibility = View.GONE
         }
 
-        button.setOnClickListener {
-            val ipString = input.text.toString().trim()
+        val autoIp = intent?.getStringExtra("AUTO_CONNECT_IP")
+        val mode = intent?.getStringExtra("CONNECTION_MODE") ?: "WIFI"
+        
+        if (mode == "USB") {
+            findViewById<TextView>(R.id.tvSubtitle)?.text = "USB TETHERING CONNECTION"
+            findViewById<TextView>(R.id.tvDiscoveryStatus)?.text = "Enter USB Tethered IP:"
+            layoutManualInput?.visibility = View.VISIBLE
+            btnConnectManually?.visibility = View.GONE
+            input?.setText(prefs.getString("last_usb_ip", ""))
+        } else {
+            if (!autoIp.isNullOrBlank()) {
+                startGamepadDirectly(autoIp, fromAutoIntent = true)
+            } else {
+                input?.setText(prefs.getString("last_ip", ""))
+                startDiscoveryScanner()
+            }
+        }
+        
+        button?.setOnClickListener {
+            val ipString = input?.text?.toString()?.trim() ?: ""
             if (ipString.isNotBlank()) {
                 var ip = ipString
                 var port = 5000
@@ -198,11 +197,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     ip = parts[0]
                     port = parts[1].toIntOrNull() ?: 5000
                 }
-                
+
                 button.text = "CONNECTING..."
                 button.isEnabled = false
-                
-                prefs.edit { putString("last_ip", ipString) }
+
+                if (mode == "USB") {
+                    prefs.edit { putString("last_usb_ip", ipString) }
+                } else {
+                    prefs.edit { putString("last_ip", ipString) }
+                }
 
                 thread {
                     val playerIndex = UdpSender.pingServer(ip, port)
@@ -237,33 +240,106 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             startActivity(intent)
             finish()
         }
+    }
 
-        btnScanQr.setOnClickListener {
-            val scanner = GmsBarcodeScanning.getClient(this)
-            scanner.startScan()
-                .addOnSuccessListener { barcode ->
-                    val rawValue = barcode.rawValue
-                    if (rawValue != null) {
-                        if (rawValue.startsWith("Nyxx://")) {
-                            val uri = rawValue.toUri()
-                            val ip = uri.getQueryParameter("ip")
-                            val port = uri.getQueryParameter("port") ?: "5000"
-                            if (!ip.isNullOrBlank()) {
-                                runOnUiThread {
-                                    input.setText(getString(R.string.ip_port_format, ip, port))
+    private fun startDiscoveryScanner() {
+        val tvDiscoveryStatus = findViewById<TextView>(R.id.tvDiscoveryStatus) ?: return
+        val llDiscoveredServers = findViewById<LinearLayout>(R.id.llDiscoveredServers) ?: return
+        val discovery = ServerDiscovery()
+
+        discoveryJob?.cancel()
+        discoveryJob = lifecycleScope.launch {
+            while (isActive) {
+                val servers = discovery.discoverServers()
+                withContext(Dispatchers.Main) {
+                    if (servers.isNotEmpty()) {
+                        tvDiscoveryStatus.text = "Available Servers:"
+                        llDiscoveredServers.removeAllViews()
+
+                        for (server in servers) {
+                            val btn = Button(this@MainActivity).apply {
+                                text = "🖥️ ${server.hostname} (${server.ip})"
+                                isAllCaps = false
+                                textSize = 14f
+                                setBackgroundResource(R.drawable.btn_premium_card)
+                                setTextColor(android.graphics.Color.WHITE)
+                                setPadding(24, 24, 24, 24)
+                                layoutParams = LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT
+                                ).apply {
+                                    setMargins(0, 0, 0, 12)
                                 }
-                                button.performClick()
+                                
+                                setOnClickListener {
+                                    startGamepadDirectly("${server.ip}:${server.port}", fromAutoIntent = false)
+                                }
                             }
-                        } else {
-                            input.setText(rawValue)
-                            button.performClick()
+                            llDiscoveredServers.addView(btn)
                         }
+                    } else {
+                        tvDiscoveryStatus.text = "Searching for available servers..."
+                        llDiscoveredServers.removeAllViews()
                     }
                 }
-                .addOnFailureListener { e ->
-                    Toast.makeText(this, "Scan failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
+                kotlinx.coroutines.delay(2500)
+            }
         }
+    }
+
+    private fun startGamepadDirectly(ipWithPort: String, fromAutoIntent: Boolean = false) {
+        var ip = ipWithPort
+        var port = 5000
+
+        if (ipWithPort.contains(":")) {
+            val parts = ipWithPort.split(":")
+            ip = parts[0]
+            port = parts[1].toIntOrNull() ?: 5000
+        }
+
+        // Cancel discovery
+        discoveryJob?.cancel()
+
+        // Connect immediately
+        thread {
+            val playerIndex = UdpSender.pingServer(ip, port)
+            runOnUiThread {
+                if (playerIndex > 0) {
+                    val prefs = getSharedPreferences("GamepadPrefs", Context.MODE_PRIVATE)
+                    prefs.edit().putString("last_ip", ipWithPort).apply()
+                    startGamepad(ip, port, playerIndex)
+                } else {
+                    showConnectionError(playerIndex, ip, port)
+                    if (fromAutoIntent) {
+                        val intent = Intent(this@MainActivity, HomeActivity::class.java)
+                        startActivity(intent)
+                        finish()
+                    } else {
+                        findViewById<LinearLayout>(R.id.layoutManualInput)?.visibility = View.VISIBLE
+                        findViewById<TextView>(R.id.btnConnectManually)?.visibility = View.GONE
+                        startDiscoveryScanner()
+                    }
+                }
+            }
+        }
+    }
+
+    // Helper function for error handling
+    private fun showConnectionError(playerIndex: Int, ip: String, port: Int) {
+        val title: String
+        val message: String
+        if (playerIndex == 0) {
+            title = "Server Full"
+            message = "The server at $ip:$port already has 8 players connected.\n\nPlease wait for a player to disconnect and try again."
+        } else {
+            title = "Connection Failed"
+            message = "Could not connect to $ip:$port.\nMake sure the server is running and your PC firewall allows UDP port $port."
+        }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .show()
     }
 
 
@@ -294,6 +370,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         udpSender?.start()
         updateBatteryLevel()
 
+        // Set orientation BEFORE setContentView to prevent layout flash.
+        // The spinner will fire onItemSelected after the view is inflated, but by that
+        // point the activity is already in the right orientation so no recreation occurs.
+        val lastProfileId = getSharedPreferences("GamepadPrefs", Context.MODE_PRIVATE)
+            .getString("lastProfile", "nintendo") ?: "nintendo"
+        requestedOrientation = if (lastProfileId == "wii" || lastProfileId == "joycon_l" || lastProfileId == "joycon_r") {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+
         setContentView(R.layout.activity_gamepad)
         Toast.makeText(this, "Connected as Player $playerIndex", Toast.LENGTH_LONG).show()
         
@@ -305,9 +392,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         setupGamepadViewInteractions()
     }
 
+
     @android.annotation.SuppressLint("SetTextI18n")
     private fun startBluetoothGamepad() {
         bluetoothSender = BluetoothHidSender(this)
+        bluetoothSender?.onDisconnected = {
+            runOnUiThread {
+                bluetoothSender?.stop()
+                val intent = Intent(this@MainActivity, HomeActivity::class.java)
+                startActivity(intent)
+                finish()
+            }
+        }
         bluetoothSender?.start()
         
         setContentView(R.layout.activity_gamepad)
@@ -331,31 +427,44 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
         
         gamepadView?.onEditModeExited = {
-            findViewById<LinearLayout>(R.id.panelEditProperties)?.visibility = View.GONE
+            val floatingBox = findViewById<View>(R.id.editModeFloatingBox)
+            val overlay2 = findViewById<View>(R.id.editModeOverlay)
+
+            floatingBox?.animate()?.alpha(0f)?.setDuration(180)?.withEndAction {
+                floatingBox.visibility = View.GONE
+                floatingBox.alpha = 1f
+            }?.start()
+            
+            // Fade out overlay
+            overlay2?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
+                overlay2.visibility = View.GONE
+                overlay2.alpha = 1f
+            }?.start()
         }
         
         setupSidebar()
-        setupDraggablePanel()
+        setupEditModeFloatingBox()
+        applyGamepadTheme()
     }
 
-    private fun setupDraggablePanel() {
-        val panel = findViewById<LinearLayout>(R.id.panelEditProperties) ?: return
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun setupEditModeFloatingBox() {
+        val view = gamepadView ?: return
+        val floatingBox = findViewById<LinearLayout>(R.id.editModeFloatingBox) ?: return
+        val header = floatingBox.findViewById<View>(R.id.editModeHeader)
+
+        // Dragging Logic
         var dX = 0f
         var dY = 0f
-
-        panel.setOnTouchListener { view, event ->
-            when (event.actionMasked) {
+        header.setOnTouchListener { _, event ->
+            when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    dX = view.x - event.rawX
-                    dY = view.y - event.rawY
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    view.performClick()
+                    dX = floatingBox.x - event.rawX
+                    dY = floatingBox.y - event.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    view.animate()
+                    floatingBox.animate()
                         .x(event.rawX + dX)
                         .y(event.rawY + dY)
                         .setDuration(0)
@@ -365,140 +474,123 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 else -> false
             }
         }
+
+        // Preview / Eye toggle
+        val btnEye = floatingBox.findViewById<android.widget.FrameLayout>(R.id.btnPreviewToggle)
+        val tvEye = floatingBox.findViewById<ImageView>(R.id.tvEyeIcon)
+        val eyeRing = floatingBox.findViewById<View>(R.id.eyeActiveRing)
+        val propertiesContent = floatingBox.findViewById<View>(R.id.layoutPropertiesContent)
+
+        fun updateEyeState(isPreview: Boolean) {
+            if (isPreview) {
+                // Bright, fully opaque — clearly ON
+                tvEye?.alpha = 1f
+                eyeRing?.animate()?.alpha(1f)?.setDuration(150)?.start()
+                eyeRing?.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    ThemeConfig.primaryColor
+                )
+                propertiesContent?.visibility = View.GONE  // hide properties in preview
+            } else {
+                // Dim — clearly OFF
+                tvEye?.alpha = 0.35f
+                eyeRing?.animate()?.alpha(0f)?.setDuration(150)?.start()
+                // Re-show properties if a group was selected
+                val tvTitle = floatingBox.findViewById<TextView>(R.id.tvSheetTitle)
+                if (tvTitle?.text != "PROPERTIES" && tvTitle?.text?.startsWith("✦") == true) {
+                    propertiesContent?.visibility = View.VISIBLE
+                }
+            }
+        }
+
+        btnEye?.setOnClickListener {
+            view.togglePreviewMode()
+            updateEyeState(view.isPreviewMode)
+        }
+        updateEyeState(false)
+
+        // DONE button — save and exit (onEditModeExited drives all animations)
+        floatingBox.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btnDoneEdit)?.setOnClickListener {
+            view.saveEditMode()
+        }
+        // CANCEL button — discard and exit
+        floatingBox.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btnCancelAllEdit)?.setOnClickListener {
+            view.cancelEditMode()
+        }
     }
 
+    @android.annotation.SuppressLint("SetTextI18n")
     private fun showButtonPropertiesDialog(groupName: String) {
         val view = gamepadView ?: return
-        val panel = findViewById<LinearLayout>(R.id.panelEditProperties) ?: return
+        val floatingBox = findViewById<LinearLayout>(R.id.editModeFloatingBox) ?: return
+        val propertiesContent = floatingBox.findViewById<View>(R.id.layoutPropertiesContent)
         
-        panel.visibility = View.VISIBLE
-        
-        val tvTitle = panel.findViewById<TextView>(R.id.tvSheetTitle)
-        
-        val tvSize = panel.findViewById<TextView>(R.id.tvSizeLabel)
-        val btnSizeMinus = panel.findViewById<Button>(R.id.btnSizeMinus)
-        val btnSizePlus = panel.findViewById<Button>(R.id.btnSizePlus)
-        
-        val tvSpacing = panel.findViewById<TextView>(R.id.tvSpacingLabel)
-        val btnSpacingMinus = panel.findViewById<Button>(R.id.btnSpacingMinus)
-        val btnSpacingPlus = panel.findViewById<Button>(R.id.btnSpacingPlus)
-        val rowSpacing = panel.findViewById<LinearLayout>(R.id.rowSpacing)
-        
-        val tvOpacity = panel.findViewById<TextView>(R.id.tvOpacityLabel)
-        val btnOpacityMinus = panel.findViewById<Button>(R.id.btnOpacityMinus)
-        val btnOpacityPlus = panel.findViewById<Button>(R.id.btnOpacityPlus)
-        
-        val switchVisible = panel.findViewById<SwitchCompat>(R.id.switchVisible)
-        val switchTurbo = panel.findViewById<SwitchCompat>(R.id.switchTurbo)
-        val switchAnalog = panel.findViewById<SwitchCompat>(R.id.switchAnalog)
+        // Ensure the content section is visible now that we selected something
+        if (propertiesContent?.visibility != View.VISIBLE && !view.isPreviewMode) {
+            propertiesContent?.visibility = View.VISIBLE
+        }
 
-        val btnCancelEdit = panel.findViewById<Button>(R.id.btnCancelEdit)
-        val btnSaveEdit = panel.findViewById<Button>(R.id.btnSaveEdit)
+        val tvTitle = floatingBox.findViewById<TextView>(R.id.tvSheetTitle)
+        val tvSize = floatingBox.findViewById<TextView>(R.id.tvSizeLabel)
+        val btnSizeMinus = floatingBox.findViewById<Button>(R.id.btnSizeMinus)
+        val btnSizePlus = floatingBox.findViewById<Button>(R.id.btnSizePlus)
+        val tvSpacing = floatingBox.findViewById<TextView>(R.id.tvSpacingLabel)
+        val btnSpacingMinus = floatingBox.findViewById<Button>(R.id.btnSpacingMinus)
+        val btnSpacingPlus = floatingBox.findViewById<Button>(R.id.btnSpacingPlus)
+        val rowSpacing = floatingBox.findViewById<LinearLayout>(R.id.rowSpacing)
+        val tvOpacity = floatingBox.findViewById<TextView>(R.id.tvOpacityLabel)
+        val btnOpacityMinus = floatingBox.findViewById<Button>(R.id.btnOpacityMinus)
+        val btnOpacityPlus = floatingBox.findViewById<Button>(R.id.btnOpacityPlus)
+        val switchVisible = floatingBox.findViewById<SwitchCompat>(R.id.switchVisible)
+        val switchTurbo = floatingBox.findViewById<SwitchCompat>(R.id.switchTurbo)
+        val switchAnalog = floatingBox.findViewById<SwitchCompat>(R.id.switchAnalog)
 
-        tvTitle?.text = "$groupName PROPERTIES"
-        
+        tvTitle?.text = "✦ ${groupName.uppercase()}"
         val config = view.buttonConfigs[groupName] ?: ButtonConfig()
 
         fun updateUI() {
-            tvSize?.text = "${"%.1f".format(config.scale)}x"
-            tvSpacing?.text = "${"%.1f".format(config.spacing)}x"
+            tvSize?.text = "${"%.1f".format(config.scale)}×"
+            tvSpacing?.text = "${"%.1f".format(config.spacing)}×"
             tvOpacity?.text = "${(config.opacity * 100).toInt()}%"
-            
-            if (groupName == "ABXY" || groupName == "DPad") {
-                rowSpacing?.visibility = View.VISIBLE
-            } else {
-                rowSpacing?.visibility = View.INVISIBLE
-            }
-
+            rowSpacing?.visibility = if (groupName == "ABXY" || groupName == "DPad") View.VISIBLE else View.INVISIBLE
             switchVisible?.isChecked = config.visible
             switchTurbo?.isChecked = config.turbo
             switchAnalog?.isChecked = config.analogTrigger
-            
-            if (groupName == "L2" || groupName == "R2") {
-                switchAnalog?.visibility = View.VISIBLE
-            } else {
-                switchAnalog?.visibility = View.GONE
-            }
+            switchAnalog?.visibility = if (groupName == "L2" || groupName == "R2") View.VISIBLE else View.GONE
         }
-        
         updateUI()
 
         btnSizeMinus?.setOnClickListener {
             config.scale = (config.scale - 0.1f).coerceAtLeast(0.5f)
-            view.buttonConfigs[groupName] = config
-            view.applyScales()
-            view.invalidate()
-            view.saveConfigState()
-            updateUI()
+            view.buttonConfigs[groupName] = config; view.applyScales(); view.invalidate(); view.saveConfigState(); updateUI()
         }
         btnSizePlus?.setOnClickListener {
             config.scale = (config.scale + 0.1f).coerceAtMost(2.0f)
-            view.buttonConfigs[groupName] = config
-            view.applyScales()
-            view.invalidate()
-            view.saveConfigState()
-            updateUI()
+            view.buttonConfigs[groupName] = config; view.applyScales(); view.invalidate(); view.saveConfigState(); updateUI()
         }
-
         btnSpacingMinus?.setOnClickListener {
             config.spacing = (config.spacing - 0.1f).coerceAtLeast(0.5f)
-            view.buttonConfigs[groupName] = config
-            view.applyScales()
-            view.invalidate()
-            view.saveConfigState()
-            updateUI()
+            view.buttonConfigs[groupName] = config; view.applyScales(); view.invalidate(); view.saveConfigState(); updateUI()
         }
         btnSpacingPlus?.setOnClickListener {
             config.spacing = (config.spacing + 0.1f).coerceAtMost(2.0f)
-            view.buttonConfigs[groupName] = config
-            view.applyScales()
-            view.invalidate()
-            view.saveConfigState()
-            updateUI()
+            view.buttonConfigs[groupName] = config; view.applyScales(); view.invalidate(); view.saveConfigState(); updateUI()
         }
-
         btnOpacityMinus?.setOnClickListener {
             config.opacity = (config.opacity - 0.1f).coerceAtLeast(0.1f)
-            view.buttonConfigs[groupName] = config
-            view.saveConfigState()
-            view.invalidate()
-            updateUI()
+            view.buttonConfigs[groupName] = config; view.saveConfigState(); view.invalidate(); updateUI()
         }
         btnOpacityPlus?.setOnClickListener {
             config.opacity = (config.opacity + 0.1f).coerceAtMost(1.0f)
-            view.buttonConfigs[groupName] = config
-            view.saveConfigState()
-            view.invalidate()
-            updateUI()
+            view.buttonConfigs[groupName] = config; view.saveConfigState(); view.invalidate(); updateUI()
         }
-
         switchVisible?.setOnCheckedChangeListener { _, isChecked ->
-            config.visible = isChecked
-            view.buttonConfigs[groupName] = config
-            view.saveConfigState()
-            view.invalidate()
+            config.visible = isChecked; view.buttonConfigs[groupName] = config; view.saveConfigState(); view.invalidate()
         }
-
         switchTurbo?.setOnCheckedChangeListener { _, isChecked ->
-            config.turbo = isChecked
-            view.buttonConfigs[groupName] = config
-            view.saveConfigState()
+            config.turbo = isChecked; view.buttonConfigs[groupName] = config; view.saveConfigState()
         }
-
         switchAnalog?.setOnCheckedChangeListener { _, isChecked ->
-            config.analogTrigger = isChecked
-            view.buttonConfigs[groupName] = config
-            view.saveConfigState()
-        }
-
-        btnSaveEdit?.setOnClickListener {
-            panel.visibility = View.GONE
-            view.saveEditMode()
-        }
-        
-        btnCancelEdit?.setOnClickListener {
-            panel.visibility = View.GONE
-            view.cancelEditMode()
+            config.analogTrigger = isChecked; view.buttonConfigs[groupName] = config; view.saveConfigState()
         }
     }
 
@@ -509,8 +601,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val spinnerGyroMode = findViewById<Spinner>(R.id.spinnerGyroMode)
         val switchGyro = findViewById<SwitchCompat>(R.id.switchGyro)
         val switchDanceMode = findViewById<SwitchCompat>(R.id.switchDanceMode)
-        val btnCalibrateSensors = findViewById<Button>(R.id.btnCalibrateSensors)
         
+        // Sync initial state
+        isGyroEnabled = switchGyro?.isChecked == true
+        view.isGyroEnabled = isGyroEnabled
+
         switchGyro?.setOnCheckedChangeListener { _, isChecked ->
             // Fix 7: Warn if gyro is toggled in Bluetooth mode
             if (isChecked && bluetoothSender != null) {
@@ -521,7 +616,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             isGyroEnabled = isChecked
             view.isGyroEnabled = isChecked
             layoutGyroMode?.visibility = if (isChecked) View.VISIBLE else View.GONE
-            btnCalibrateSensors?.visibility = if (isChecked || isDanceModeEnabled) View.VISIBLE else View.GONE
+            view.invalidate()
             
             if (isChecked) {
                 gravitySensor?.let {
@@ -539,9 +634,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
         
+        // Sync initial state
+        isDanceModeEnabled = switchDanceMode?.isChecked == true
+        view.isDanceModeEnabled = isDanceModeEnabled
+
         switchDanceMode?.setOnCheckedChangeListener { _, isChecked ->
             isDanceModeEnabled = isChecked
-            btnCalibrateSensors?.visibility = if (isChecked || isGyroEnabled) View.VISIBLE else View.GONE
+            view.isDanceModeEnabled = isChecked
+            view.invalidate()
             if (isChecked) {
                 accelSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
                 gyroSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
@@ -565,7 +665,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
         
-        findViewById<Button>(R.id.btnCalibrateSensors)?.setOnClickListener {
+        view.onCalibrateRequested = {
             needsGyroCalibration = true
             // Only count frames for sensors that actually exist; otherwise finishCalibration()
             // would wait forever for a counter that never decrements.
@@ -573,11 +673,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             calibrationFramesGyro = if (gyroSensor != null) 30 else 0
             if (calibrationFramesAccel == 0 && calibrationFramesGyro == 0) {
                 Toast.makeText(this, "No motion sensors available to calibrate.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+            } else {
+                sumAx = 0.0; sumAy = 0.0; sumAz = 0.0
+                sumGx = 0.0; sumGy = 0.0; sumGz = 0.0
+                Toast.makeText(this, "Hold phone completely still for 1 second...", Toast.LENGTH_LONG).show()
             }
-            sumAx = 0.0; sumAy = 0.0; sumAz = 0.0
-            sumGx = 0.0; sumGy = 0.0; sumGz = 0.0
-            Toast.makeText(this, "Hold phone completely still for 1 second...", Toast.LENGTH_LONG).show()
         }
 
         val switchRumble = findViewById<SwitchCompat>(R.id.switchRumble)
@@ -590,7 +690,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
         
         // Profiles Setup
-        val spinner = findViewById<Spinner>(R.id.spinnerProfile)
+        val tvSelectedProfile = findViewById<TextView>(R.id.tvSelectedProfile)
         val profiles = listOf(
             GamepadProfiles.NINTENDO,
             GamepadProfiles.JOYCON_L,
@@ -599,48 +699,93 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             GamepadProfiles.XBOX,
             GamepadProfiles.PSP
         )
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, profiles.map { it.displayName })
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinner.adapter = adapter
         
         val sharedPrefs = getSharedPreferences("GamepadPrefs", android.content.Context.MODE_PRIVATE)
         val lastProfileId = sharedPrefs.getString("lastProfile", "nintendo")
+        var currentProfile = profiles.find { it.id == lastProfileId } ?: GamepadProfiles.NINTENDO
+        
+        val listPopupWindow = androidx.appcompat.widget.ListPopupWindow(this)
+        listPopupWindow.anchorView = tvSelectedProfile
+        listPopupWindow.verticalOffset = 16 // A little below the display box
+        listPopupWindow.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.parseColor("#15171E")))
+        
+        fun applyProfile(p: GamepadProfile) {
+            currentProfile = p
+            tvSelectedProfile?.text = p.displayName
+            view.setProfile(p)
+            udpSender?.state?.joyconType = when (p.id) {
+                "joycon_l" -> 1.toByte() // Left
+                "joycon_r" -> 0.toByte() // Right
+                else -> 2.toByte()       // Pro
+            }
+            sharedPrefs.edit { putString("lastProfile", p.id) }
+            requestedOrientation = if (p.id == "wii" || p.id == "joycon_l" || p.id == "joycon_r") {
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            } else {
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+            
+            val switchGyro = findViewById<SwitchCompat>(R.id.switchGyro)
+            val layoutGyroMode = findViewById<LinearLayout>(R.id.layoutGyroMode)
+            if (!p.hasLeftStick && !p.hasSecondStick) {
+                switchGyro?.visibility = View.GONE
+                switchGyro?.isChecked = false
+                layoutGyroMode?.visibility = View.GONE
+            } else {
+                switchGyro?.visibility = View.VISIBLE
+                layoutGyroMode?.visibility = if (switchGyro?.isChecked == true) View.VISIBLE else View.GONE
+            }
+        }
         
         // Initial Selection
-        val initialIndex = profiles.indexOfFirst { it.id == lastProfileId }.coerceAtLeast(0)
-        spinner.setSelection(initialIndex)
+        applyProfile(currentProfile)
         
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, viewSelected: View?, position: Int, id: Long) {
-                val p = profiles[position]
-                view.setProfile(p)
-                udpSender?.state?.joyconType = when (p.id) {
-                    "joycon_l" -> 1 // Left
-                    "joycon_r" -> 0 // Right
-                    else -> 2       // Pro
-                }.toByte()
-                sharedPrefs.edit { putString("lastProfile", p.id) }
-                requestedOrientation = if (p.id == "wii" || p.id == "joycon_l" || p.id == "joycon_r") {
-                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                } else {
-                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                }
+        tvSelectedProfile?.setOnClickListener {
+            // Filter out the currently active profile
+            val availableProfiles = profiles.filter { it.id != currentProfile.id }
+            val adapter = ArrayAdapter(this, R.layout.spinner_item, availableProfiles.map { it.displayName })
+            listPopupWindow.setAdapter(adapter)
+            listPopupWindow.setOnItemClickListener { _, _, position, _ ->
+                applyProfile(availableProfiles[position])
+                listPopupWindow.dismiss()
             }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
+            listPopupWindow.show()
         }
 
         findViewById<Button>(R.id.btnEditLayout).setOnClickListener {
             view.enterEditMode()
             drawerLayout?.closeDrawers()
+            
+            val overlay = findViewById<View>(R.id.editModeOverlay)
+            val floatingBox = findViewById<View>(R.id.editModeFloatingBox)
+            
+            // Reset floating box position to center
+            floatingBox?.x = (resources.displayMetrics.widthPixels - resources.displayMetrics.density * 340) / 2f
+            floatingBox?.y = (resources.displayMetrics.heightPixels - resources.displayMetrics.density * 200) / 2f
+            
+            // Ensure properties content is hidden until an element is selected
+            floatingBox?.findViewById<View>(R.id.layoutPropertiesContent)?.visibility = View.GONE
+            floatingBox?.findViewById<TextView>(R.id.tvSheetTitle)?.text = "Select a button"
+            
+            if (overlay?.visibility != View.VISIBLE) {
+                overlay?.alpha = 0f
+                overlay?.visibility = View.VISIBLE
+                overlay?.animate()?.alpha(1f)?.setDuration(220)?.start()
+            }
+            if (floatingBox?.visibility != View.VISIBLE) {
+                floatingBox?.alpha = 0f
+                floatingBox?.visibility = View.VISIBLE
+                floatingBox?.animate()?.alpha(1f)?.setDuration(220)?.start()
+            }
         }
         
         findViewById<android.widget.ImageButton>(R.id.btnOpenMenu)?.setOnClickListener {
             drawerLayout?.openDrawer(androidx.core.view.GravityCompat.START)
         }
-        
+
         findViewById<Button>(R.id.btnResetLayout).setOnClickListener {
             view.resetLayoutDefaults()
-            setupSidebar() 
+            setupSidebar()
         }
         
         findViewById<Button>(R.id.btnReconnect).setOnClickListener {
@@ -714,8 +859,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     
 
 
+    private fun validateSensorData(event: SensorEvent): Boolean {
+        return when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                val x = event.values[0]
+                val y = event.values[1] 
+                val z = event.values[2]
+                x in -100f..100f && y in -100f..100f && z in -100f..100f
+            }
+            Sensor.TYPE_GYROSCOPE -> {
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+                x in -2000f..2000f && y in -2000f..2000f && z in -2000f..2000f
+            }
+            Sensor.TYPE_GRAVITY -> {
+                val x = event.values[0]
+                val y = event.values[1]
+                x in -50f..50f && y in -50f..50f
+            }
+            else -> true
+        }
+    }
+
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
+        if (!validateSensorData(event)) return
         
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
@@ -779,21 +948,22 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
             }
             Sensor.TYPE_GRAVITY -> {
-                if (!isGyroEnabled) return
-            if (needsGyroCalibration) {
-                gyroOffsetX = event.values[0]
-                gyroOffsetY = event.values[1]
-                smoothedTiltX = 0f
-                smoothedTiltY = 0f
-                needsGyroCalibration = false
-                runOnUiThread { 
-                    gamepadView?.triggerCalibrationFlash()
-                    Toast.makeText(this@MainActivity, "Gyro Calibrated!", Toast.LENGTH_SHORT).show() 
+                if (needsGyroCalibration) {
+                    gyroOffsetX = event.values[0]
+                    gyroOffsetY = event.values[1]
+                    smoothedTiltX = 0f
+                    smoothedTiltY = 0f
+                    needsGyroCalibration = false
+                    runOnUiThread { 
+                        gamepadView?.triggerCalibrationFlash()
+                        Toast.makeText(this@MainActivity, "Gyro Calibrated!", Toast.LENGTH_SHORT).show() 
+                    }
                 }
-            }
 
-            val rawTiltX = event.values[0] - gyroOffsetX
-            val rawTiltY = event.values[1] - gyroOffsetY
+                if (!isGyroEnabled) return
+
+                val rawTiltX = event.values[0] - gyroOffsetX
+                val rawTiltY = event.values[1] - gyroOffsetY
             
             // Low-pass filter for smoothing to prevent jitter
             smoothedTiltX += 0.2f * (rawTiltX - smoothedTiltX)
@@ -862,4 +1032,34 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun applyMainTheme() {
+        val pColor = ThemeConfig.primaryColor
+        findViewById<TextView>(R.id.tvNyxx)?.setShadowLayer(12f, 0f, 4f, pColor)
+        findViewById<TextView>(R.id.tvSubtitle)?.setTextColor(pColor)
+        findViewById<Button>(R.id.connectButton)?.setTextColor(pColor)
+        findViewById<android.widget.ImageButton>(R.id.btnBackToHome)?.setColorFilter(pColor)
+    }
+
+    private fun applyGamepadTheme() {
+        val pColor = ThemeConfig.primaryColor
+        val bgColor = ThemeConfig.backgroundColor
+        // Accent tints
+        findViewById<android.widget.ImageButton>(R.id.btnOpenMenu)?.setColorFilter(pColor)
+        findViewById<TextView>(R.id.tvSheetTitle)?.setTextColor(pColor)
+        findViewById<TextView>(R.id.tvMenuTitle)?.setTextColor(pColor)
+        
+        // Sidebar headers & Quick Calibrate button
+        findViewById<TextView>(R.id.tvSectionProfile)?.setTextColor(pColor)
+        findViewById<TextView>(R.id.tvSectionSensors)?.setTextColor(pColor)
+        findViewById<TextView>(R.id.tvSectionSystem)?.setTextColor(pColor)
+
+        // Tint the DONE button in the new top bar
+        val floatingBox = findViewById<LinearLayout>(R.id.editModeFloatingBox)
+        floatingBox?.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btnDoneEdit)
+            ?.backgroundTintList = android.content.res.ColorStateList.valueOf(pColor)
+
+        // Background propagation
+        drawerLayout?.setBackgroundColor(bgColor)
+    }
 }

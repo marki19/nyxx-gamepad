@@ -7,7 +7,6 @@ using System.Windows.Media.Imaging;
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
-using QRCoder;
 using System.Linq;
 using System.IO.Pipes;
 using System.Threading.Tasks;
@@ -17,12 +16,22 @@ namespace NativeGamepadServer
 {
     public partial class MainWindow : Window
     {
+        private class ConnectedClientInfo
+        {
+            public string Ip { get; set; } = "";
+            public string ControllerType { get; set; } = "Pro Controller";
+            public string Battery { get; set; } = "Unknown";
+        }
+        private readonly ConnectedClientInfo?[] activeClients = new ConnectedClientInfo?[9]; // 1-8
+
         private GamepadServer server;
+        private DiscoveryServer? discoveryServer;
         private System.Windows.Forms.NotifyIcon? notifyIcon;
 
         public MainWindow()
         {
             InitializeComponent();
+            txtVersion.Text = " v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString();
             server = new GamepadServer();
             server.PlayerConnected += Server_PlayerConnected;
             server.PlayerDisconnected += Server_PlayerDisconnected;
@@ -33,7 +42,7 @@ namespace NativeGamepadServer
             StartIpcServer();
             _ = CheckForUpdatesAsync();
             AppendLog("Nyxx Server UI Initialized. Ready to start.");
-            UpdateQrCode();
+            UpdateIpDisplay();
 
             var versionObj = typeof(MainWindow).Assembly.GetName().Version;
             string localVersion = "v" + (versionObj != null ? $"{versionObj.Major}.{versionObj.Minor}.{versionObj.Build}" : "1.0.0");
@@ -96,32 +105,11 @@ namespace NativeGamepadServer
             }
         }
 
-        private void UpdateQrCode()
+        private void UpdateIpDisplay()
         {
             string ip = GetLocalIPAddress();
             string port = txtPort.Text;
-            txtIp.Text = $"IP: {ip}";
-            
-            string qrData = $"Nyxx://connect?ip={ip}&port={port}";
-            using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
-            using (QRCodeData qrCodeData = qrGenerator.CreateQrCode(qrData, QRCodeGenerator.ECCLevel.Q))
-            using (QRCode qrCode = new QRCode(qrCodeData))
-            {
-                using (var bitmap = qrCode.GetGraphic(20))
-                {
-                    using (MemoryStream memory = new MemoryStream())
-                    {
-                        bitmap.Save(memory, System.Drawing.Imaging.ImageFormat.Png);
-                        memory.Position = 0;
-                        BitmapImage bitmapImage = new BitmapImage();
-                        bitmapImage.BeginInit();
-                        bitmapImage.StreamSource = memory;
-                        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmapImage.EndInit();
-                        qrImage.Source = bitmapImage;
-                    }
-                }
-            }
+            txtIp.Text = $"IP: {ip}:{port}";
         }
 
         private string GetLocalIPAddress()
@@ -236,10 +224,12 @@ namespace NativeGamepadServer
             if (server.IsRunning)
             {
                 server.Stop();
+                discoveryServer?.Stop();
                 btnToggle.Content = "START SERVER";
-                btnToggle.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8A2BE2"));
+                btnToggle.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888888"));
                 txtPort.IsEnabled = true;
                 txtDsuPort.IsEnabled = true;
+                cboControllerType.IsEnabled = true;
                 ResetSlots();
                 AppendLog("Server stopped.");
             }
@@ -247,15 +237,21 @@ namespace NativeGamepadServer
             {
                 if (int.TryParse(txtPort.Text, out int port) && int.TryParse(txtDsuPort.Text, out int dsuPort))
                 {
-                    int activePort = server.Start(port, dsuPort);
-                    if (server.IsRunning && activePort > 0)
+                    int p = server.Start(port, dsuPort);
+                    if (p > 0)
                     {
-                        txtPort.Text = activePort.ToString();
-                        UpdateQrCode();
+                        server.SelectedControllerType = cboControllerType.SelectedIndex == 1 ? ControllerType.DualShock4 : ControllerType.Xbox360;
+                        discoveryServer = new DiscoveryServer(p);
+                        discoveryServer.Start();
+
+                        txtPort.Text = p.ToString();
+                        UpdateIpDisplay();
+                        
                         btnToggle.Content = "STOP SERVER";
                         btnToggle.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF5C5C"));
                         txtPort.IsEnabled = false;
                         txtDsuPort.IsEnabled = false;
+                        cboControllerType.IsEnabled = false;
                         if (server.DsuRunning) {
                             AppendLog($"DSU/Cemuhook available on ports {dsuPort} and {dsuPort + 1}");
                         } else {
@@ -292,7 +288,12 @@ namespace NativeGamepadServer
         {
             Dispatcher.Invoke(() =>
             {
+                if (e.PlayerIndex >= 1 && e.PlayerIndex <= 8)
+                {
+                    activeClients[e.PlayerIndex] = new ConnectedClientInfo { Ip = e.IpAddress };
+                }
                 UpdateSlot(e.PlayerIndex, true, e.IpAddress);
+                UpdateConnectionStatusUI();
             });
         }
 
@@ -300,7 +301,12 @@ namespace NativeGamepadServer
         {
             Dispatcher.Invoke(() =>
             {
+                if (e.PlayerIndex >= 1 && e.PlayerIndex <= 8)
+                {
+                    activeClients[e.PlayerIndex] = null;
+                }
                 UpdateSlot(e.PlayerIndex, false, "");
+                UpdateConnectionStatusUI();
             });
         }
 
@@ -308,6 +314,37 @@ namespace NativeGamepadServer
 
         private void Server_StateUpdated(object? sender, GamepadStateArgs e)
         {
+            if (e.PlayerIndex >= 1 && e.PlayerIndex <= 8)
+            {
+                var info = activeClients[e.PlayerIndex];
+                if (info != null)
+                {
+                    string batt = e.BatteryLevel switch
+                    {
+                        0 => "Empty",
+                        1 => "Low",
+                        2 => "Medium",
+                        3 => "High",
+                        4 => "Full",
+                        _ => "Unknown"
+                    };
+                    string type = e.JoyConType switch
+                    {
+                        JoyConType.Left => "Joy-Con (L)",
+                        JoyConType.Right => "Joy-Con (R)",
+                        JoyConType.Pro => "Pro Controller",
+                        _ => "Gamepad"
+                    };
+
+                    if (info.Battery != batt || info.ControllerType != type)
+                    {
+                        info.Battery = batt;
+                        info.ControllerType = type;
+                        UpdateConnectionStatusUI();
+                    }
+                }
+            }
+
             long currentTicks = DateTime.UtcNow.Ticks;
             if (currentTicks - lastUiUpdateTicks < 330000) return; // Rate limit to ~30 FPS (33ms) to prevent UI freezing
             lastUiUpdateTicks = currentTicks;
@@ -324,6 +361,38 @@ namespace NativeGamepadServer
                     case 6: UpdateTesterState(thumb6L, thumb6R, prog6L, prog6R, btn6Txt, e); break;
                     case 7: UpdateTesterState(thumb7L, thumb7R, prog7L, prog7R, btn7Txt, e); break;
                     case 8: UpdateTesterState(thumb8L, thumb8R, prog8L, prog8R, btn8Txt, e); break;
+                }
+            });
+        }
+
+        private void UpdateConnectionStatusUI()
+        {
+            int activeCount = 0;
+            var sb = new System.Text.StringBuilder();
+            for (int i = 1; i <= 8; i++)
+            {
+                var client = activeClients[i];
+                if (client != null)
+                {
+                    activeCount++;
+                    sb.AppendLine($"Player {i}: {client.Ip}");
+                    sb.AppendLine($"Type: {client.ControllerType}");
+                    sb.AppendLine($"Battery: {client.Battery}");
+                    sb.AppendLine("-----------------------");
+                }
+            }
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                txtActiveClients.Text = $"Connected Devices: {activeCount}/8";
+                if (activeCount == 0)
+                {
+                    borderClientDetails.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    borderClientDetails.Visibility = Visibility.Visible;
+                    txtClientDetails.Text = sb.ToString().TrimEnd();
                 }
             });
         }
@@ -358,9 +427,23 @@ namespace NativeGamepadServer
             
         }
 
+        private static readonly string[] PlayerColors = {
+            "", // index 0 unused
+            "#0078D7", // P1 — Xbox Blue
+            "#FF5C5C", // P2 — Red
+            "#3DDC84", // P3 — Green
+            "#FFD54F", // P4 — Yellow
+            "#AF87FF", // P5 — Purple
+            "#4FC3F7", // P6 — Cyan
+            "#FF8C00", // P7 — Orange
+            "#CF9FFF"  // P8 — Violet
+        };
+
         private void UpdateSlot(int index, bool connected, string ip)
         {
-            string colorHex = connected ? "#8A2BE2" : "#3D4249";
+            string colorHex = connected
+                ? (index >= 1 && index <= 8 ? PlayerColors[index] : "#888888")
+                : "#3D4249";
             var brush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(colorHex));
             string text = connected ? $"Connected: {ip}" : "Waiting...";
 
@@ -387,6 +470,11 @@ namespace NativeGamepadServer
 
         private void ResetSlots()
         {
+            for (int i = 1; i <= 8; i++)
+            {
+                activeClients[i] = null;
+            }
+            UpdateConnectionStatusUI();
             UpdateSlot(1, false, ""); UpdateSlot(2, false, ""); UpdateSlot(3, false, ""); UpdateSlot(4, false, "");
             UpdateSlot(5, false, ""); UpdateSlot(6, false, ""); UpdateSlot(7, false, ""); UpdateSlot(8, false, "");
         }

@@ -26,3 +26,20 @@ Thumbs.db
 # Workspace Data
 .agents/
 scratch/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+# uv scaffold (placeholder entry point, not project code)
+main.py
+
+# Graphify
+graphify-out/
+# AI / Tooling / Uploads
+Github Upload Builds/
+.claudeignore*
+.graphifyignore
+.python-version
+pyproject.toml
+uv.lock

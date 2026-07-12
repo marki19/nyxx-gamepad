@@ -2,11 +2,140 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Nyxx Server" Height="650" Width="700" MinWidth="700" MinHeight="650"
-        Background="#0B0C10" Foreground="#EDEEF0"
+        Background="#121212" Foreground="#EDEEF0"
         WindowStartupLocation="CenterScreen"
         Icon="icon.png"
         StateChanged="Window_StateChanged">
     
+    <Window.Resources>
+        <!-- Style for ComboBoxItem (Dropdown items) -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#1C1F24"/>
+            <Setter Property="Foreground" Value="#EDEEF0"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#2A2F37"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#3D4249"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Toggle Button for ComboBox -->
+        <Style x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border" 
+                                Background="#1C1F24" 
+                                BorderBrush="#3D4249" 
+                                BorderThickness="1" 
+                                CornerRadius="6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="25" />
+                                </Grid.ColumnDefinitions>
+                                <!-- Path for the dropdown arrow -->
+                                <Path x:Name="Arrow" 
+                                      Grid.Column="1" 
+                                      Fill="#A0A5B0" 
+                                      HorizontalAlignment="Center" 
+                                      VerticalAlignment="Center" 
+                                      Data="M 0 0 L 4 4 L 8 0 Z"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter TargetName="Border" Property="Background" Value="#2A2F37"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#888888"/>
+                                <Setter TargetName="Arrow" Property="Fill" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="true">
+                                <Setter TargetName="Border" Property="Background" Value="#1C1F24"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#888888"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Main ComboBox Style -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#1C1F24"/>
+            <Setter Property="Foreground" Value="#EDEEF0"/>
+            <Setter Property="BorderBrush" Value="#3D4249"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <!-- The ToggleButton handles the click to show/hide popup -->
+                            <ToggleButton Name="ToggleButton" 
+                                          Style="{StaticResource ComboBoxToggleButton}" 
+                                          Focusable="false"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                          ClickMode="Press"/>
+                            <!-- The ContentPresenter displays the currently selected item -->
+                            <ContentPresenter Name="ContentSite" 
+                                              IsHitTestVisible="False" 
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="10,3,30,3"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"/>
+                            <TextBox x:Name="PART_EditableTextBox"
+                                     Style="{x:Null}"
+                                     HorizontalAlignment="Left" 
+                                     VerticalAlignment="Center" 
+                                     Margin="3,3,23,3"
+                                     Focusable="True" 
+                                     Background="Transparent"
+                                     Visibility="Hidden"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}"/>
+                            <!-- Popup containing the dropdown items -->
+                            <Popup Name="Popup" 
+                                   Placement="Bottom" 
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" 
+                                   AllowsTransparency="True" 
+                                   Focusable="False" 
+                                   PopupAnimation="Slide">
+                                <Grid Name="DropDown" 
+                                      SnapsToDevicePixels="True" 
+                                      MinWidth="{TemplateBinding ActualWidth}" 
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" 
+                                            Background="#1C1F24" 
+                                            BorderBrush="#3D4249" 
+                                            BorderThickness="1" 
+                                            CornerRadius="6"
+                                            Margin="0,2,0,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="2" Opacity="0.4"/>
+                                        </Border.Effect>
+                                        <ScrollViewer Margin="4" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -16,19 +145,58 @@
         </Grid.RowDefinitions>
 
         <TextBlock HorizontalAlignment="Center" Margin="0,0,0,20">
-            <Run Text="Nyxx Server" FontSize="26" FontWeight="Bold" Foreground="#8A2BE2"/>
+            <Run Text="Nyxx Server" FontSize="26" FontWeight="Bold" Foreground="#AAAAAA"/>
             <Run x:Name="txtVersion" Text=" v1.0.0" FontSize="16" FontWeight="Normal" Foreground="#A0A5B0"/>
             <TextBlock.Effect>
-                <DropShadowEffect Color="#8A2BE2" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
+                <DropShadowEffect Color="#888888" BlurRadius="15" ShadowDepth="0" Opacity="0.2"/>
             </TextBlock.Effect>
         </TextBlock>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
             <TextBlock Text="UDP Port:" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="14" Foreground="#A0A5B0"/>
-            <TextBox x:Name="txtPort" Text="5000" Width="80" Height="35" FontSize="16" VerticalContentAlignment="Center" TextAlignment="Center" Margin="0,0,20,0" Background="#1C1F24" Foreground="#EDEEF0" BorderBrush="#8A2BE2"/>
+            <TextBox x:Name="txtPort" Text="5000" Width="60" Height="35" FontSize="16" VerticalContentAlignment="Center" TextAlignment="Center" Margin="0,0,20,0" Background="#1C1F24" Foreground="#EDEEF0" BorderBrush="#888888"/>
             <TextBlock Text="DSU Port:" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="14" Foreground="#A0A5B0"/>
-            <TextBox x:Name="txtDsuPort" Text="26760" Width="80" Height="35" FontSize="16" VerticalContentAlignment="Center" TextAlignment="Center" Margin="0,0,20,0" Background="#1C1F24" Foreground="#EDEEF0" BorderBrush="#8A2BE2"/>
-            <Button x:Name="btnToggle" Content="START SERVER" Width="160" Height="40" Background="#8A2BE2" Foreground="White" FontWeight="Bold" FontSize="14" Click="BtnToggle_Click">
+            <TextBox x:Name="txtDsuPort" Text="26760" Width="60" Height="35" FontSize="16" VerticalContentAlignment="Center" TextAlignment="Center" Margin="0,0,20,0" Background="#1C1F24" Foreground="#EDEEF0" BorderBrush="#888888"/>
+            <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="14" Foreground="#A0A5B0"/>
+            <ComboBox x:Name="cboControllerType" Width="110" Height="35" FontSize="14" VerticalContentAlignment="Center" Margin="0,0,10,0">
+                <ComboBoxItem Content="Xbox 360" IsSelected="True"/>
+                <ComboBoxItem Content="DualShock 4"/>
+            </ComboBox>
+            <ToggleButton x:Name="btnHelp" Width="20" Height="20" Background="#1C1F24" BorderBrush="#3D4249" BorderThickness="1" Foreground="#A0A5B0" FontWeight="Bold" FontSize="11" Content="?" VerticalAlignment="Center" Margin="0,0,20,0" Cursor="Hand">
+                <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#2A2F37"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#888888"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#3D4249"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#AAAAAA"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </ToggleButton.Template>
+            </ToggleButton>
+            
+            <Popup x:Name="popHelp" PlacementTarget="{Binding ElementName=btnHelp}" Placement="Bottom" IsOpen="{Binding IsChecked, ElementName=btnHelp, Mode=TwoWay}" AllowsTransparency="True" StaysOpen="False" PopupAnimation="Fade">
+                <Border Background="#1C1F24" BorderBrush="#3D4249" BorderThickness="1" CornerRadius="8" Padding="12" Width="280" Margin="0,5,0,0">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="3" Opacity="0.4"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <TextBlock Text="Controller Emulation Mode" FontWeight="Bold" FontSize="13" Margin="0,0,0,8" Foreground="White"/>
+                        <TextBlock Text="• Xbox 360: Standard XInput. Maximum compatibility with native PC games and Steam." TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#EDEEF0" FontSize="12"/>
+                        <TextBlock Text="• DualShock 4: Emulates a PS4 controller. Recommended for native PlayStation prompts or emulators with built-in DS4 mappings." TextWrapping="Wrap" Foreground="#EDEEF0" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+            </Popup>
+            <Button x:Name="btnToggle" Content="START SERVER" Width="140" Height="40" Background="#888888" Foreground="White" FontWeight="Bold" FontSize="14" Click="BtnToggle_Click">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
@@ -36,7 +204,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#A040FF"/>
+                                <Setter TargetName="border" Property="Background" Value="#AAAAAA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -68,16 +236,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb1L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb1L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb1R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb1R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog1L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog1R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog1L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog1R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn1Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -95,16 +263,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb2L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb2L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb2R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb2R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog2L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog2R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog2L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog2R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn2Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -122,16 +290,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb3L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb3L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb3R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb3R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog3L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog3R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog3L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog3R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn3Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -149,16 +317,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb4L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb4L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb4R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb4R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog4L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog4R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog4L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog4R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn4Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -176,16 +344,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb5L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb5L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb5R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb5R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog5L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog5R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog5L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog5R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn5Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -203,16 +371,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb6L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb6L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb6R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb6R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog6L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog6R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog6L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog6R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn6Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -230,16 +398,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb7L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb7L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb7R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb7R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog7L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog7R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog7L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog7R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn7Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -257,16 +425,16 @@
                                     </Grid.ColumnDefinitions>
                                     <Canvas Grid.Column="0" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb8L" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb8L" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                     <Canvas Grid.Column="1" Width="40" Height="40" HorizontalAlignment="Center">
                                         <Ellipse Width="40" Height="40" Stroke="#3D4249" StrokeThickness="2"/>
-                                        <Ellipse x:Name="thumb8R" Width="8" Height="8" Fill="#8A2BE2" Canvas.Left="16" Canvas.Top="16"/>
+                                        <Ellipse x:Name="thumb8R" Width="8" Height="8" Fill="#888888" Canvas.Left="16" Canvas.Top="16"/>
                                     </Canvas>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                    <ProgressBar x:Name="prog8L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
-                                    <ProgressBar x:Name="prog8R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#8A2BE2" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog8L" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Margin="0,0,10,0" Background="#1C1F24" BorderThickness="0"/>
+                                    <ProgressBar x:Name="prog8R" Width="50" Height="6" Minimum="0" Maximum="255" Value="0" Foreground="#888888" Background="#1C1F24" BorderThickness="0"/>
                                 </StackPanel>
                                 <TextBlock x:Name="btn8Txt" Text="--" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,0"/>
                             </StackPanel>
@@ -276,17 +444,29 @@
                 </Viewbox>
             </Border>
 
-            <Border Grid.Column="1" BorderBrush="#3D4249" BorderThickness="1" CornerRadius="12" Background="#14161A" Margin="10,0,0,0">
+            <Border Grid.Column="1" BorderBrush="#3D4249" BorderThickness="1" CornerRadius="12" Background="#14161A" Margin="10,0,0,0" Padding="15">
                 <Border.Effect>
                     <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="8" Opacity="0.6"/>
                 </Border.Effect>
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="CONNECT PHONE" FontWeight="Bold" FontSize="16" Foreground="#8A2BE2" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <Border Background="White" Padding="10" CornerRadius="8">
-                        <Image x:Name="qrImage" Width="140" Height="140" Stretch="Uniform"/>
-                    </Border>
-                    <TextBlock x:Name="txtIp" Text="IP: 192.168.1.1" FontSize="14" Foreground="#EDEEF0" HorizontalAlignment="Center" Margin="0,15,0,0"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Text="CONNECTION STATUS" FontWeight="Bold" FontSize="15" Foreground="#888888" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                        <TextBlock x:Name="txtIp" Text="Server IP: 192.168.1.1" FontSize="13" Foreground="#EDEEF0" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock x:Name="txtActiveClients" Text="Connected Devices: 0/8" FontSize="13" Foreground="#A0A5B0" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        
+                        <Border x:Name="borderClientDetails" BorderBrush="#3D4249" BorderThickness="1" CornerRadius="6" Background="#1C1F24" Padding="8" Visibility="Collapsed" Height="130">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="txtClientDetails" Text="" FontSize="12" Foreground="#EDEEF0" LineHeight="18" TextWrapping="Wrap"/>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </Grid>
             </Border>
         </Grid>
 
@@ -300,7 +480,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Border Background="#1C1F24" CornerRadius="12,12,0,0" Padding="10,5">
-                    <TextBlock Text="Server Log" FontWeight="Bold" Foreground="#8A2BE2"/>
+                    <TextBlock Text="Server Log" FontWeight="Bold" Foreground="#888888"/>
                 </Border>
                 <ScrollViewer Grid.Row="1" x:Name="logScroll" Margin="10" VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="txtConsole" Foreground="#00FF00" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>

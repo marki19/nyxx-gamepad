@@ -317,7 +317,6 @@ BitConverter.GetBytes(gZ).CopyTo(buf, idx); idx += 4;
 
         private void SendControllerInfo(UdpClient udp, IPEndPoint ep, byte[] requestData)
         {
-            int portsCount = 4;
             List<byte> slotsToReport = new List<byte> { 0, 1, 2, 3 };
 
             if (requestData.Length >= 24)
