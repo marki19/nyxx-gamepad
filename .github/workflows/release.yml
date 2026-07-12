@@ -24,8 +24,10 @@ jobs:
           cache: gradle
           
       - name: Build APK
-        working-directory: ./client
-        run: gradle assembleDebug
+        uses: gradle/gradle-build-action@v3
+        with:
+          arguments: assembleDebug
+          build-root-directory: client
         
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
