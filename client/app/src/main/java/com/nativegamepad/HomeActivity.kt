@@ -34,6 +34,26 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    private fun setUpdateButtonState(isUpdateAvailable: Boolean) {
+        val tvUpdateText = findViewById<android.widget.TextView>(R.id.tvUpdateText)
+        val ivUpdateIcon = findViewById<android.widget.ImageView>(R.id.ivUpdateIcon)
+        if (isUpdateAvailable) {
+            tvUpdateText.text = "UPDATE AVAILABLE"
+            tvUpdateText.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+            tvUpdateText.setTypeface(null, android.graphics.Typeface.BOLD)
+            ivUpdateIcon.setImageResource(R.drawable.ic_new_releases)
+            ivUpdateIcon.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#4CAF50"))
+            ivUpdateIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#121212"))
+        } else {
+            tvUpdateText.text = "CHECK UPDATE"
+            tvUpdateText.setTextColor(android.graphics.Color.parseColor("#C5C6C7"))
+            tvUpdateText.setTypeface(null, android.graphics.Typeface.NORMAL)
+            ivUpdateIcon.setImageResource(R.drawable.ic_update)
+            ivUpdateIcon.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#2C2C2C"))
+            ivUpdateIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#C5C6C7"))
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeConfig.load(this)
@@ -69,11 +89,32 @@ class HomeActivity : AppCompatActivity() {
         }
 
         val prefs = getSharedPreferences("GamepadPrefs", MODE_PRIVATE)
+        val updateUrl = prefs.getString("update_url", "")
+        val btnUpdate = findViewById<View>(R.id.btnUpdate)
+        
+        setUpdateButtonState(!updateUrl.isNullOrEmpty())
+        
+        btnUpdate.setOnClickListener {
+            if (prefs.getString("update_url", "").isNullOrEmpty()) {
+                checkForUpdates(manual = true)
+            } else {
+                val tagName = prefs.getString("update_tag", "")
+                AlertDialog.Builder(this)
+                    .setTitle("Update Available")
+                    .setMessage("A new version of Nyxx ($tagName) is available!\n\nWould you like to download it now?")
+                    .setPositiveButton("Download") { _, _ ->
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(prefs.getString("update_url", ""))))
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+
         val lastCheck = prefs.getLong("last_update_check", 0L)
         val now = System.currentTimeMillis()
         if (now - lastCheck > 12 * 60 * 60 * 1000L) { // 12 hours
             prefs.edit().putLong("last_update_check", now).apply()
-            checkForUpdates()
+            checkForUpdates(manual = false)
         }
 
         val wifiButton = findViewById<Button>(R.id.btnConnectWifi)
@@ -134,7 +175,10 @@ class HomeActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun checkForUpdates() {
+    private fun checkForUpdates(manual: Boolean = false) {
+        if (manual) {
+            android.widget.Toast.makeText(this, "Checking for updates...", android.widget.Toast.LENGTH_SHORT).show()
+        }
         thread {
             try {
                 val repoOwner = "marki19"
@@ -161,22 +205,54 @@ class HomeActivity : AppCompatActivity() {
                     val localVersion = "v" + BuildConfig.VERSION_NAME
                     
                     if (tagName.isNotEmpty() && tagName != localVersion) {
+                        val prefs = getSharedPreferences("GamepadPrefs", MODE_PRIVATE)
+                        prefs.edit()
+                            .putString("update_url", htmlUrl)
+                            .putString("update_tag", tagName)
+                            .apply()
+                            
                         runOnUiThread {
-                            AlertDialog.Builder(this)
-                                .setTitle("Update Available")
-                                .setMessage("A new version of Nyxx ($tagName) is available!\n\nWould you like to download it now?")
-                                .setPositiveButton("Download") { _, _ ->
-                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl))
-                                    startActivity(browserIntent)
-                                }
-                                .setNegativeButton("Skip") { _, _ -> }
-                                .show()
+                            setUpdateButtonState(true)
+                            if (manual) {
+                                AlertDialog.Builder(this@HomeActivity)
+                                    .setTitle("Update Available")
+                                    .setMessage("A new version of Nyxx ($tagName) is available!\n\nWould you like to download it now?")
+                                    .setPositiveButton("Download") { _, _ ->
+                                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl)))
+                                    }
+                                    .setNegativeButton("Cancel", null)
+                                    .show()
+                            }
                         }
+                    } else {
+                        getSharedPreferences("GamepadPrefs", MODE_PRIVATE).edit()
+                            .remove("update_url")
+                            .remove("update_tag")
+                            .apply()
+                        runOnUiThread {
+                            setUpdateButtonState(false)
+                            if (manual) {
+                                AlertDialog.Builder(this@HomeActivity)
+                                    .setTitle("Up to Date")
+                                    .setMessage("You are already running the latest version of Nyxx ($localVersion).")
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                        }
+                    }
+                } else if (manual) {
+                    runOnUiThread {
+                        android.widget.Toast.makeText(this@HomeActivity, "Failed to check for updates.", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
                 connection.disconnect()
             } catch (e: Exception) {
                 e.printStackTrace()
+                if (manual) {
+                    runOnUiThread {
+                        android.widget.Toast.makeText(this@HomeActivity, "Error checking for updates.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }
