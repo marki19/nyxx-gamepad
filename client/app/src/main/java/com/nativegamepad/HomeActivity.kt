@@ -89,6 +89,18 @@ class HomeActivity : AppCompatActivity() {
         }
 
         val prefs = getSharedPreferences("GamepadPrefs", MODE_PRIVATE)
+        val localVersion = "v" + BuildConfig.VERSION_NAME
+        val lastKnownVersion = prefs.getString("last_known_version", "")
+        
+        if (lastKnownVersion != localVersion) {
+            prefs.edit()
+                .putString("last_known_version", localVersion)
+                .remove("update_url")
+                .remove("update_tag")
+                .putLong("last_update_check", 0L)
+                .apply()
+        }
+
         val updateUrl = prefs.getString("update_url", "")
         val btnUpdate = findViewById<View>(R.id.btnUpdate)
         
