@@ -138,6 +138,17 @@
 
     btnCal.addEventListener('click', () => {
       window.gyroCalibrate();
+      
+      // Center analog sticks in case they get stuck visually or logically
+      ['left', 'right'].forEach(side => {
+        const s = sticks[side];
+        s.active = false;
+        if (s.knob) s.knob.style.transform = 'translate(-50%, -50%)';
+        if (s.el) s.el.classList.remove('active');
+      });
+      window.PAD.lx = 0; window.PAD.ly = 0;
+      window.PAD.rx = 0; window.PAD.ry = 0;
+
       // Brief flash feedback
       btnCal.textContent = 'ZEROED!';
       setTimeout(() => { btnCal.textContent = 'CALIBRATE'; }, 800);
