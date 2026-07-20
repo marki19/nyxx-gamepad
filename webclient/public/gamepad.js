@@ -168,6 +168,13 @@
   if (window.location.hostname !== 'localhost' && window.location.hostname.match(/^[0-9\.]+$/)) {
     defaultIp = window.location.hostname;
     defaultPort = window.location.port || '5001';
+    
+    // Auto-connect seamlessly
+    setTimeout(() => {
+      if (inpIp.value === defaultIp) {
+        window.nyxxConnect(defaultIp, defaultPort);
+      }
+    }, 50);
   }
 
   inpIp.value   = defaultIp;
@@ -209,13 +216,13 @@
     }
   }
 
-  btnConn.addEventListener('click', async () => {
+  btnConn.addEventListener('click', async (e) => {
     const ip   = inpIp.value.trim();
     const port = inpPort.value.trim() || '5001';
     if (!ip) { inpIp.focus(); return; }
 
-    // Auto-enable gyro if available
-    if (!window.gyroEnabled()) {
+    // If it's a manual user click, try enabling gyro immediately
+    if (e && e.isTrusted && !window.gyroEnabled()) {
       const on = await window.gyroToggle();
       const btnGyro = document.getElementById('btn-gyro');
       const btnCal  = document.getElementById('btn-calibrate');
@@ -228,6 +235,24 @@
 
     window.nyxxConnect(ip, port);
   });
+
+  // Seamless auto-gyro on first touch if they bypassed the connect screen
+  let autoGyroAttempted = false;
+  document.addEventListener('pointerdown', async (e) => {
+    if (!autoGyroAttempted && !window.gyroEnabled() && !screenConnect.classList.contains('hidden') === false) {
+      autoGyroAttempted = true;
+      try {
+        const on = await window.gyroToggle();
+        const btnGyro = document.getElementById('btn-gyro');
+        const btnCal  = document.getElementById('btn-calibrate');
+        if (btnGyro && btnCal) {
+          btnGyro.textContent  = on ? 'GYRO ON'  : 'GYRO OFF';
+          btnGyro.classList.toggle('active', on);
+          btnCal.classList.toggle('hidden', !on);
+        }
+      } catch (err) {}
+    }
+  }, { capture: true, passive: true });
 
   // Allow Enter key in IP field
   inpIp.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnConn.click(); });
