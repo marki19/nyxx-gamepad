@@ -12,118 +12,6 @@
 
 (function () {
 
-  // ── Stick state ──────────────────────────────────────────────────────────
-  const sticks = {
-    left:  { el: null, knob: null, active: false, pointerId: -1, cx: 0, cy: 0, r: 0 },
-    right: { el: null, knob: null, active: false, pointerId: -1, cx: 0, cy: 0, r: 0 },
-  };
-
-  const MAX_AXIS = 32767;
-  const DEADZONE = 0.08; // fractional dead zone
-
-  function initStick(side, zoneId, knobId) {
-    const s    = sticks[side];
-    const ring = document.querySelector(`#${zoneId} .stick-ring`);
-    s.el   = ring;
-    s.knob = document.getElementById(knobId);
-
-    ring.addEventListener('pointerdown',  (e) => stickDown(s, e), { passive: false });
-    ring.addEventListener('pointermove',  (e) => stickMove(s, e), { passive: false });
-    ring.addEventListener('pointerup',    (e) => stickUp(s, e, side));
-    ring.addEventListener('pointercancel',(e) => stickUp(s, e, side));
-  }
-
-  function stickDown(s, e) {
-    if (s.active) return;
-    e.preventDefault();
-    ring(s).setPointerCapture(e.pointerId);
-    s.active = true; s.pointerId = e.pointerId;
-    const rect = ring(s).getBoundingClientRect();
-    s.cx = rect.left + rect.width  / 2;
-    s.cy = rect.top  + rect.height / 2;
-    s.r  = rect.width / 2;
-    ring(s).classList.add('active');
-    updateStick(s, e.clientX, e.clientY, s === sticks.left);
-  }
-
-  function stickMove(s, e) {
-    if (!s.active || e.pointerId !== s.pointerId) return;
-    e.preventDefault();
-    updateStick(s, e.clientX, e.clientY, s === sticks.left);
-  }
-
-  function stickUp(s, e, side) {
-    if (!s.active || e.pointerId !== s.pointerId) return;
-    s.active = false;
-    ring(s).classList.remove('active');
-    s.knob.style.transform = 'translate(-50%, -50%)';
-    if (side === 'left') { window.PAD.lx = 0; window.PAD.ly = 0; }
-    else                 { window.PAD.rx = 0; window.PAD.ry = 0; }
-  }
-
-  function ring(s) { return s.el; }
-
-  function updateStick(s, px, py, isLeft) {
-    let dx = px - s.cx;
-    let dy = py - s.cy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxR = s.r - 4; // knob edge
-    if (dist > maxR) {
-      const scale = maxR / dist;
-      dx *= scale; dy *= scale;
-    }
-    // Position knob visually
-    s.knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-
-    // Map to -1..1 with deadzone
-    let nx = dx / maxR;
-    let ny = dy / maxR;
-    const m = Math.sqrt(nx * nx + ny * ny);
-    if (m < DEADZONE) { nx = 0; ny = 0; }
-    else {
-      const scaled = (m - DEADZONE) / (1 - DEADZONE);
-      nx = (nx / m) * scaled;
-      ny = (ny / m) * scaled;
-    }
-
-    const ax = Math.round(nx * MAX_AXIS);
-    const ay = Math.round(ny * MAX_AXIS);
-    if (isLeft) { window.PAD.lx = ax; window.PAD.ly = ay; }
-    else        { window.PAD.rx = ax; window.PAD.ry = ay; }
-  }
-
-  // ── Buttons ──────────────────────────────────────────────────────────────
-  function initButtons() {
-    // Every element with data-bit is a binary button
-    document.querySelectorAll('[data-bit]').forEach((el) => {
-      const bit = parseInt(el.dataset.bit, 16);
-      el.addEventListener('pointerdown',  (e) => { e.preventDefault(); setBtn(bit, true,  el); }, { passive: false });
-      el.addEventListener('pointerup',    ()  => setBtn(bit, false, el));
-      el.addEventListener('pointercancel',()  => setBtn(bit, false, el));
-    });
-
-    // Triggers (LT / RT) — binary press
-    document.getElementById('btn-lt').addEventListener('pointerdown',  (e) => { e.preventDefault(); setTrigger('lt', 255); }, { passive: false });
-    document.getElementById('btn-lt').addEventListener('pointerup',    () => setTrigger('lt', 0));
-    document.getElementById('btn-lt').addEventListener('pointercancel',() => setTrigger('lt', 0));
-
-    document.getElementById('btn-rt').addEventListener('pointerdown',  (e) => { e.preventDefault(); setTrigger('rt', 255); }, { passive: false });
-    document.getElementById('btn-rt').addEventListener('pointerup',    () => setTrigger('rt', 0));
-    document.getElementById('btn-rt').addEventListener('pointercancel',() => setTrigger('rt', 0));
-  }
-
-  function setBtn(bit, pressed, el) {
-    if (pressed) window.PAD.buttons |= bit;
-    else         window.PAD.buttons &= ~bit;
-    el.classList.toggle('pressed', pressed);
-  }
-
-  function setTrigger(which, val) {
-    window.PAD[which] = val;
-    const el = document.getElementById('btn-' + which);
-    el.classList.toggle('pressed', val > 0);
-  }
-
   // ── Gyro button ──────────────────────────────────────────────────────────
   function initGyroButton() {
     const btnGyro = document.getElementById('btn-gyro');
@@ -131,21 +19,15 @@
 
     btnGyro.addEventListener('click', async () => {
       const on = await window.gyroToggle();
-      btnGyro.textContent  = on ? 'DANCE MODE: ON'  : 'DANCE MODE: OFF';
-      btnGyro.classList.toggle('active', on);
+      btnGyro.innerHTML  = on ? 'DANCE MODE: ON<br><br><span style="font-size: 16px; font-weight: normal; color: #88ff88;">Streaming Motion...</span>'  : 'DANCE MODE: OFF<br><br><span style="font-size: 16px; font-weight: normal; color: #888;">Tap to Start</span>';
+      btnGyro.style.borderColor = on ? '#00ff88' : '#333';
+      btnGyro.style.boxShadow = on ? '0 0 40px rgba(0, 255, 136, 0.4)' : '0 10px 30px rgba(0,0,0,0.5)';
       btnCal.classList.toggle('hidden', !on);
     });
 
     btnCal.addEventListener('click', () => {
       window.gyroCalibrate();
       
-      // Center analog sticks in case they get stuck visually or logically
-      ['left', 'right'].forEach(side => {
-        const s = sticks[side];
-        s.active = false;
-        if (s.knob) s.knob.style.transform = 'translate(-50%, -50%)';
-        if (s.el) s.el.classList.remove('active');
-      });
       window.PAD.lx = 0; window.PAD.ly = 0;
       window.PAD.rx = 0; window.PAD.ry = 0;
 
@@ -238,8 +120,9 @@
       const btnGyro = document.getElementById('btn-gyro');
       const btnCal  = document.getElementById('btn-calibrate');
       if (btnGyro && btnCal) {
-        btnGyro.textContent  = on ? 'DANCE MODE: ON'  : 'DANCE MODE: OFF';
-        btnGyro.classList.toggle('active', on);
+        btnGyro.innerHTML  = on ? 'DANCE MODE: ON<br><br><span style="font-size: 16px; font-weight: normal; color: #88ff88;">Streaming Motion...</span>'  : 'DANCE MODE: OFF<br><br><span style="font-size: 16px; font-weight: normal; color: #888;">Tap to Start</span>';
+        btnGyro.style.borderColor = on ? '#00ff88' : '#333';
+        btnGyro.style.boxShadow = on ? '0 0 40px rgba(0, 255, 136, 0.4)' : '0 10px 30px rgba(0,0,0,0.5)';
         btnCal.classList.toggle('hidden', !on);
       }
     }
@@ -257,8 +140,9 @@
         const btnGyro = document.getElementById('btn-gyro');
         const btnCal  = document.getElementById('btn-calibrate');
         if (btnGyro && btnCal) {
-          btnGyro.textContent  = on ? 'DANCE MODE: ON'  : 'DANCE MODE: OFF';
-          btnGyro.classList.toggle('active', on);
+          btnGyro.innerHTML  = on ? 'DANCE MODE: ON<br><br><span style="font-size: 16px; font-weight: normal; color: #88ff88;">Streaming Motion...</span>'  : 'DANCE MODE: OFF<br><br><span style="font-size: 16px; font-weight: normal; color: #888;">Tap to Start</span>';
+          btnGyro.style.borderColor = on ? '#00ff88' : '#333';
+          btnGyro.style.boxShadow = on ? '0 0 40px rgba(0, 255, 136, 0.4)' : '0 10px 30px rgba(0,0,0,0.5)';
           btnCal.classList.toggle('hidden', !on);
         }
       } catch (err) {}
@@ -295,9 +179,6 @@
   window.addEventListener('nyxx:showConnect', () => showConnectScreen());
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  initStick('left',  'zone-left',  'knob-left');
-  initStick('right', 'zone-right', 'knob-right');
-  initButtons();
   initGyroButton();
 
   // Lock to landscape on mobile browsers that support it

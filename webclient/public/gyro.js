@@ -17,8 +17,6 @@
   const GYRO_DEADZONE  = 0.8;    // deg/s noise floor
   const LP_ALPHA       = 0.15;   // 0=frozen 1=no filter (lower = smoother)
   const DEG2RAD        = Math.PI / 180;
-  const ACCEL_SCALE    = 9.8;    // normalise accel to ±1 g
-  const GYRO_SCALE     = 360;    // normalise gyro to ±1 full-turn/sec
 
   // ── State ─────────────────────────────────────────────────────────────
   let enabled    = false;
@@ -27,10 +25,10 @@
   let rawBuf     = { ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 };
 
   // ── Low-pass helper ───────────────────────────────────────────────────
-  function lp(prev, raw, deadzone, scale) {
+  function lp(prev, raw, deadzone) {
     if (Math.abs(raw) < deadzone) raw = 0;
     const next = prev + LP_ALPHA * (raw - prev);
-    return Math.abs(next) < 0.001 ? 0 : next / scale;
+    return Math.abs(next) < 0.001 ? 0 : next;
   }
 
   // ── DeviceMotionEvent handler ─────────────────────────────────────────
@@ -48,13 +46,13 @@
     rawBuf.gy = ((g.gamma || 0) * DEG2RAD) - calibrated.gy;
     rawBuf.gz = ((g.alpha || 0) * DEG2RAD) - calibrated.gz;
 
-    // Filter & normalise
-    smoothed.ax = lp(smoothed.ax, rawBuf.ax, ACCEL_DEADZONE, ACCEL_SCALE);
-    smoothed.ay = lp(smoothed.ay, rawBuf.ay, ACCEL_DEADZONE, ACCEL_SCALE);
-    smoothed.az = lp(smoothed.az, rawBuf.az, ACCEL_DEADZONE, ACCEL_SCALE);
-    smoothed.gx = lp(smoothed.gx, rawBuf.gx, GYRO_DEADZONE * DEG2RAD, GYRO_SCALE * DEG2RAD);
-    smoothed.gy = lp(smoothed.gy, rawBuf.gy, GYRO_DEADZONE * DEG2RAD, GYRO_SCALE * DEG2RAD);
-    smoothed.gz = lp(smoothed.gz, rawBuf.gz, GYRO_DEADZONE * DEG2RAD, GYRO_SCALE * DEG2RAD);
+    // Filter without scaling (keep raw m/s² and rad/s for Just Dance compatibility)
+    smoothed.ax = lp(smoothed.ax, rawBuf.ax, ACCEL_DEADZONE);
+    smoothed.ay = lp(smoothed.ay, rawBuf.ay, ACCEL_DEADZONE);
+    smoothed.az = lp(smoothed.az, rawBuf.az, ACCEL_DEADZONE);
+    smoothed.gx = lp(smoothed.gx, rawBuf.gx, GYRO_DEADZONE * DEG2RAD);
+    smoothed.gy = lp(smoothed.gy, rawBuf.gy, GYRO_DEADZONE * DEG2RAD);
+    smoothed.gz = lp(smoothed.gz, rawBuf.gz, GYRO_DEADZONE * DEG2RAD);
 
     // Write into shared PAD state
     const p = window.PAD;
@@ -85,8 +83,9 @@
       const res = await DeviceMotionEvent.requestPermission();
       if (res !== 'granted') throw new Error('Permission denied by user.');
     }
-    // All other browsers: just add the listener
   }
+
+  let autoCalTimer = null;
 
   // ── Toggle (called by gamepad.js gyro button) ─────────────────────────
   window.gyroToggle = async function () {
@@ -95,6 +94,11 @@
         await requestPermission();
         window.addEventListener('devicemotion', onMotion, { passive: true });
         enabled = true;
+        
+        // Auto calibrate every 20 seconds to prevent drift during Just Dance
+        if (autoCalTimer) clearInterval(autoCalTimer);
+        autoCalTimer = setInterval(calibrate, 20000);
+        
         return true;
       } catch (err) {
         console.warn('Gyro permission denied:', err.message);
@@ -104,6 +108,7 @@
       window.removeEventListener('devicemotion', onMotion);
       enabled = false;
       window.PAD.hasMotion = false;
+      if (autoCalTimer) clearInterval(autoCalTimer);
       return false;
     }
   };

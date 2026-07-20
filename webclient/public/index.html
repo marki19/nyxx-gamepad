@@ -58,85 +58,21 @@
 
   <!-- ── Main gamepad UI ─────────────────────────────── -->
   <div id="gamepad" class="gamepad hidden">
-
-    <!-- TOP ROW: shoulder buttons & utility bar -->
-    <div class="top-row">
-
-      <div class="shoulder-group shoulder-group--left">
-        <button id="btn-lb" class="btn-shoulder" data-bit="0x0100">L</button>
-        <button id="btn-lt" class="btn-trigger" data-trigger="lt">ZL</button>
-      </div>
-
+    <!-- Top safe area: utility bar -->
+    <div class="safe-area-top">
       <div class="util-bar">
         <div id="conn-badge" class="conn-badge conn-badge--ok">● P1</div>
-        <button id="btn-gyro" class="btn-util">DANCE MODE: OFF</button>
-        <button id="btn-calibrate" class="btn-util btn-util--dim hidden">CALIBRATE</button>
       </div>
+    </div>
 
-      <div class="shoulder-group shoulder-group--right">
-        <button id="btn-rt" class="btn-trigger" data-trigger="rt">ZR</button>
-        <button id="btn-rb" class="btn-shoulder" data-bit="0x0200">R</button>
-      </div>
-
-    </div><!-- /top-row -->
-
-    <!-- MAIN AREA: left panel / center / right panel -->
-    <div class="main-area">
-
-      <!-- LEFT PANEL: left stick + d-pad -->
-      <div class="panel panel--left">
-        <div class="control-wrap stick-wrap">
-          <div class="stick-zone" id="zone-left">
-            <div class="stick-ring">
-              <div class="stick-knob" id="knob-left"></div>
-            </div>
-            <button class="stick-click hidden" id="btn-l3" data-bit="0x0040">L3</button>
-          </div>
-        </div>
-
-        <div class="control-wrap dpad-wrap">
-          <div class="dpad" id="dpad">
-            <button id="btn-up"    class="dpad-btn dpad-up"    data-bit="0x0001">▲</button>
-            <button id="btn-left"  class="dpad-btn dpad-left"  data-bit="0x0004">◀</button>
-            <div    class="dpad-center"></div>
-            <button id="btn-right" class="dpad-btn dpad-right" data-bit="0x0008">▶</button>
-            <button id="btn-down"  class="dpad-btn dpad-down"  data-bit="0x0002">▼</button>
-          </div>
-        </div>
-      </div><!-- /panel left -->
-
-      <!-- CENTER: minus / home / plus -->
-      <div class="panel panel--center">
-        <button id="btn-back"  class="btn-meta" data-bit="0x0020">−</button>
-        <button id="btn-guide" class="btn-guide" data-bit="0x0400">⌂</button>
-        <button id="btn-start" class="btn-meta" data-bit="0x0010">+</button>
-      </div>
-
-      <!-- RIGHT PANEL: face buttons + right stick -->
-      <div class="panel panel--right">
-        <div class="control-wrap face-wrap">
-          <div class="face-btns">
-            <button id="btn-x-sw" class="face-btn face-x-sw" data-bit="0x8000">X</button>
-            <div class="face-row-mid">
-              <button id="btn-y-sw" class="face-btn face-y-sw" data-bit="0x4000">Y</button>
-              <button id="btn-a-sw" class="face-btn face-a-sw" data-bit="0x2000">A</button>
-            </div>
-            <button id="btn-b-sw" class="face-btn face-b-sw" data-bit="0x1000">B</button>
-          </div>
-        </div>
-
-        <div class="control-wrap stick-wrap">
-          <div class="stick-zone" id="zone-right">
-            <div class="stick-ring">
-              <div class="stick-knob" id="knob-right"></div>
-            </div>
-            <button class="stick-click hidden" id="btn-r3" data-bit="0x0080">R3</button>
-          </div>
-        </div>
-      </div><!-- /panel right -->
-
-    </div><!-- /main-area -->
-
+    <!-- Massive Dance Mode UI -->
+    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+      <button id="btn-gyro" class="btn-util" style="font-size: 32px; padding: 40px; border-radius: 20px; width: 80%; max-width: 400px; height: 60%; background: #111; color: #fff; border: 4px solid #333; transition: all 0.2s; font-weight: 900; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        DANCE MODE: OFF<br><br>
+        <span style="font-size: 16px; font-weight: normal; color: #888;">Tap to Start</span>
+      </button>
+      <button id="btn-calibrate" class="btn-util btn-util--dim hidden" style="margin-top: 20px; padding: 15px 30px;">CALIBRATE</button>
+    </div>
   </div><!-- /gamepad -->
 
   <script src="ws.js"></script>
