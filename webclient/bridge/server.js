@@ -7,9 +7,10 @@ const dgram  = require('dgram');
 const os     = require('os');
 const { WebSocketServer } = require('ws');
 
-const BRIDGE_PORT   = 5001;
+const cmdPort       = parseInt(process.argv[2]);
+const GAMEPAD_PORT  = cmdPort || parseInt(process.env.NYXX_PORT) || 5000;
+const BRIDGE_PORT   = GAMEPAD_PORT;
 const GAMEPAD_HOST  = '127.0.0.1';
-const GAMEPAD_PORT  = 5000;
 const CERT_DIR      = path.join(__dirname, 'cert');
 const CERT_FILE     = path.join(CERT_DIR, 'cert.pem');
 const KEY_FILE      = path.join(CERT_DIR, 'key.pem');
