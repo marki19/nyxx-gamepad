@@ -161,8 +161,17 @@
   const certLink = document.getElementById('cert-link');
 
   // Pre-fill from localStorage
-  inpIp.value   = localStorage.getItem('nyxx-ip')   || '';
-  inpPort.value = localStorage.getItem('nyxx-port')  || '5001';
+  let defaultIp   = localStorage.getItem('nyxx-ip')   || '';
+  let defaultPort = localStorage.getItem('nyxx-port')  || '5001';
+
+  // If loaded directly from a local IP (e.g. scanned QR code to local bridge)
+  if (window.location.hostname !== 'localhost' && window.location.hostname.match(/^[0-9\.]+$/)) {
+    defaultIp = window.location.hostname;
+    defaultPort = window.location.port || '5001';
+  }
+
+  inpIp.value   = defaultIp;
+  inpPort.value = defaultPort;
 
   function updateCertLink() {
     const ip   = inpIp.value.trim();
@@ -180,7 +189,7 @@
     screenStatus.classList.add('hidden');
   }
 
-  function showStatusScreen(msg, detail, showRetry) {
+  function showStatusScreen(msg, detail, showRetry, showTrust) {
     overlay.classList.remove('hidden');
     gamepadEl.classList.add('hidden');
     screenConnect.classList.add('hidden');
@@ -188,12 +197,35 @@
     overlayStatus.textContent = msg;
     overlayDetail.textContent = detail || '';
     retryBtn.classList.toggle('hidden', !showRetry);
+    
+    const trustBtn = document.getElementById('btn-trust-cert');
+    if (trustBtn) {
+      trustBtn.classList.toggle('hidden', !showTrust);
+      if (showTrust) {
+        const ip = inpIp.value.trim() || window.location.hostname;
+        const port = inpPort.value.trim() || '5001';
+        trustBtn.href = `https://${ip}:${port}/auth`;
+      }
+    }
   }
 
-  btnConn.addEventListener('click', () => {
+  btnConn.addEventListener('click', async () => {
     const ip   = inpIp.value.trim();
     const port = inpPort.value.trim() || '5001';
     if (!ip) { inpIp.focus(); return; }
+
+    // Auto-enable gyro if available
+    if (!window.gyroEnabled()) {
+      const on = await window.gyroToggle();
+      const btnGyro = document.getElementById('btn-gyro');
+      const btnCal  = document.getElementById('btn-calibrate');
+      if (btnGyro && btnCal) {
+        btnGyro.textContent  = on ? 'GYRO ON'  : 'GYRO OFF';
+        btnGyro.classList.toggle('active', on);
+        btnCal.classList.toggle('hidden', !on);
+      }
+    }
+
     window.nyxxConnect(ip, port);
   });
 
@@ -204,11 +236,11 @@
 
   window.addEventListener('nyxx:status', ({ detail }) => {
     if (detail.state === 'connecting') {
-      showStatusScreen('Connecting to server…', '', false);
+      showStatusScreen('Connecting to server…', '', false, false);
       badge.className  = 'conn-badge conn-badge--connecting';
       badge.textContent = '● …';
     } else if (detail.state === 'disconnected') {
-      showStatusScreen('Disconnected. Retrying…', '', true);
+      showStatusScreen('Disconnected. Retrying…', '', true, false);
     }
   });
 
@@ -220,7 +252,7 @@
   });
 
   window.addEventListener('nyxx:error', ({ detail }) => {
-    showStatusScreen('Could not connect.', detail.msg, true);
+    showStatusScreen('Could not connect.', detail.msg, true, true);
   });
 
   // "Change IP" retry goes back to connect form

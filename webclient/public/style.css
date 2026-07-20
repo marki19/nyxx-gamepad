@@ -69,6 +69,16 @@ button { border: none; cursor: pointer; background: none; color: inherit; font: 
 }
 .btn-retry:active { background: var(--border); }
 
+.status-actions {
+  display: flex; gap: 8px; margin-top: 8px;
+}
+.btn-trust {
+  background: rgba(74,222,128,.15);
+  border-color: rgba(74,222,128,.4);
+  color: #4ade80; text-decoration: none; display: flex; align-items: center;
+}
+.btn-trust:active { background: rgba(74,222,128,.25); }
+
 /* ── Connect form ─────────────────────────────────────────────────────── */
 .connect-form {
   display: flex; flex-direction: column; align-items: stretch;
@@ -272,9 +282,9 @@ button { border: none; cursor: pointer; background: none; color: inherit; font: 
 
 /* ── Center: meta buttons ──────────────────────────────────────────────── */
 .btn-meta {
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   background: var(--surface); border: 1px solid var(--border);
-  font-size: 16px; color: var(--muted);
+  font-size: 18px; color: var(--muted); font-weight: 500;
   display: flex; align-items: center; justify-content: center;
   transition: background .08s, color .08s;
 }
@@ -285,7 +295,7 @@ button { border: none; cursor: pointer; background: none; color: inherit; font: 
 .btn-guide {
   width: 44px; height: 44px; border-radius: 50%;
   background: var(--surface2); border: 2px solid #3a3a3a;
-  font-size: 22px; color: #555;
+  font-size: 24px; color: #666; font-family: monospace;
   display: flex; align-items: center; justify-content: center;
   transition: background .08s, color .08s, border-color .08s;
 }
@@ -293,7 +303,7 @@ button { border: none; cursor: pointer; background: none; color: inherit; font: 
   background: #2a2a2a; color: #aaa; border-color: #666;
 }
 
-/* ── Face buttons (ABXY) ───────────────────────────────────────────────── */
+/* ── Face buttons (Switch Pro) ─────────────────────────────────────────── */
 .face-btns {
   display: flex; flex-direction: column;
   align-items: center; gap: 4px;
@@ -305,20 +315,12 @@ button { border: none; cursor: pointer; background: none; color: inherit; font: 
   width: var(--face-btn); height: var(--face-btn); border-radius: 50%;
   font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
   display: flex; align-items: center; justify-content: center;
-  border: 2px solid transparent;
+  background: linear-gradient(135deg, #222, #111);
+  border: 1px solid #333; box-shadow: inset 0 2px 4px rgba(255,255,255,.05), 0 2px 4px rgba(0,0,0,.5);
+  color: #ddd;
   transition: background .08s, border-color .08s, color .08s, transform .06s;
 }
-.face-btn:active, .face-btn.pressed { transform: scale(.92); }
-
-.face-a { background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.3); color: #4ade80; }
-.face-b { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.3); color: #f87171; }
-.face-x { background: rgba(96,165,250,.08); border-color: rgba(96,165,250,.3); color: #60a5fa; }
-.face-y { background: rgba(250,204,21,.08); border-color: rgba(250,204,21,.3); color: #facc15; }
-
-.face-a.pressed, .face-a:active { background: rgba(74,222,128,.22);  border-color: #4ade80; }
-.face-b.pressed, .face-b:active { background: rgba(248,113,113,.22); border-color: #f87171; }
-.face-x.pressed, .face-x:active { background: rgba(96,165,250,.22);  border-color: #60a5fa; }
-.face-y.pressed, .face-y:active { background: rgba(250,204,21,.22);  border-color: #facc15; }
+.face-btn:active, .face-btn.pressed { transform: scale(.92); background: #1a1a1a; color: #fff; border-color: #555; }
 
 /* ── Responsive: very short screens ───────────────────────────────────── */
 @media (max-height: 360px) {

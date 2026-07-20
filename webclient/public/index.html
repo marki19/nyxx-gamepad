@@ -49,7 +49,10 @@
       <div class="brand-sub">WEB CONTROLLER</div>
       <div id="overlay-status" class="overlay-status">Connecting…</div>
       <div id="overlay-detail" class="overlay-detail"></div>
-      <button id="btn-retry" class="btn-retry hidden">CHANGE IP</button>
+      <div class="status-actions">
+        <button id="btn-retry" class="btn-retry hidden">CHANGE IP</button>
+        <a id="btn-trust-cert" class="btn-retry btn-trust hidden" target="_blank">TRUST CERTIFICATE</a>
+      </div>
     </div>
   </div>
 
@@ -60,19 +63,19 @@
     <div class="top-row">
 
       <div class="shoulder-group shoulder-group--left">
-        <button id="btn-lb" class="btn-shoulder" data-bit="0x0100">LB</button>
-        <button id="btn-lt" class="btn-trigger" data-trigger="lt">LT</button>
+        <button id="btn-lb" class="btn-shoulder" data-bit="0x0100">L</button>
+        <button id="btn-lt" class="btn-trigger" data-trigger="lt">ZL</button>
       </div>
 
       <div class="util-bar">
         <div id="conn-badge" class="conn-badge conn-badge--ok">● P1</div>
-        <button id="btn-gyro" class="btn-util">GYRO OFF</button>
+        <button id="btn-gyro" class="btn-util hidden">GYRO OFF</button>
         <button id="btn-calibrate" class="btn-util btn-util--dim hidden">CALIBRATE</button>
       </div>
 
       <div class="shoulder-group shoulder-group--right">
-        <button id="btn-rt" class="btn-trigger" data-trigger="rt">RT</button>
-        <button id="btn-rb" class="btn-shoulder" data-bit="0x0200">RB</button>
+        <button id="btn-rt" class="btn-trigger" data-trigger="rt">ZR</button>
+        <button id="btn-rb" class="btn-shoulder" data-bit="0x0200">R</button>
       </div>
 
     </div><!-- /top-row -->
@@ -80,8 +83,15 @@
     <!-- MAIN AREA: left panel / center / right panel -->
     <div class="main-area">
 
-      <!-- LEFT PANEL: d-pad + left stick -->
+      <!-- LEFT PANEL: left stick + d-pad -->
       <div class="panel panel--left">
+
+        <div class="stick-zone" id="zone-left">
+          <div class="stick-ring">
+            <div class="stick-knob" id="knob-left"></div>
+          </div>
+          <button class="stick-click hidden" id="btn-l3" data-bit="0x0040">L3</button>
+        </div>
 
         <div class="dpad" id="dpad">
           <button id="btn-up"    class="dpad-btn dpad-up"    data-bit="0x0001">▲</button>
@@ -91,39 +101,34 @@
           <button id="btn-down"  class="dpad-btn dpad-down"  data-bit="0x0002">▼</button>
         </div>
 
-        <div class="stick-zone" id="zone-left">
-          <div class="stick-ring">
-            <div class="stick-knob" id="knob-left"></div>
-          </div>
-          <button class="stick-click" id="btn-l3" data-bit="0x0040">L3</button>
-        </div>
-
       </div><!-- /panel left -->
 
-      <!-- CENTER: back / guide / start -->
+      <!-- CENTER: minus / home / plus -->
       <div class="panel panel--center">
-        <button id="btn-back"  class="btn-meta" data-bit="0x0020">☰</button>
-        <button id="btn-guide" class="btn-guide" data-bit="0x0400">●</button>
-        <button id="btn-start" class="btn-meta" data-bit="0x0010">≡</button>
+        <button id="btn-back"  class="btn-meta" data-bit="0x0020">−</button>
+        <button id="btn-guide" class="btn-guide" data-bit="0x0400">⌂</button>
+        <button id="btn-start" class="btn-meta" data-bit="0x0010">+</button>
       </div>
 
       <!-- RIGHT PANEL: face buttons + right stick -->
       <div class="panel panel--right">
 
         <div class="face-btns">
-          <button id="btn-y" class="face-btn face-y" data-bit="0x8000">Y</button>
+          <!-- Switch Layout: X top, Y left, A right, B bottom. -->
+          <!-- We keep physical mappings (Y=top, X=left, B=right, A=bottom in XInput data-bits) -->
+          <button id="btn-x-sw" class="face-btn face-x-sw" data-bit="0x8000">X</button>
           <div class="face-row-mid">
-            <button id="btn-x" class="face-btn face-x" data-bit="0x4000">X</button>
-            <button id="btn-b" class="face-btn face-b" data-bit="0x2000">B</button>
+            <button id="btn-y-sw" class="face-btn face-y-sw" data-bit="0x4000">Y</button>
+            <button id="btn-a-sw" class="face-btn face-a-sw" data-bit="0x2000">A</button>
           </div>
-          <button id="btn-a" class="face-btn face-a" data-bit="0x1000">A</button>
+          <button id="btn-b-sw" class="face-btn face-b-sw" data-bit="0x1000">B</button>
         </div>
 
         <div class="stick-zone" id="zone-right">
           <div class="stick-ring">
             <div class="stick-knob" id="knob-right"></div>
           </div>
-          <button class="stick-click" id="btn-r3" data-bit="0x0080">R3</button>
+          <button class="stick-click hidden" id="btn-r3" data-bit="0x0080">R3</button>
         </div>
 
       </div><!-- /panel right -->

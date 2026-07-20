@@ -60,6 +60,33 @@ function serveStatic(req, res) {
   }
 
   const url = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+
+  // Certificate trust helper endpoint
+  if (url === '/auth') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Nyxx - Cert Trusted</title>
+        <style>
+          body { background: #0a0a0a; color: #4ade80; font-family: system-ui, sans-serif; 
+                 display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px; }
+          h1 { margin-bottom: 8px; }
+          p { color: #aaa; }
+        </style>
+      </head>
+      <body>
+        <h1>✅ Certificate Trusted!</h1>
+        <p>You may now close this tab and return to the controller.</p>
+        <script>setTimeout(() => window.close(), 3000);</script>
+      </body>
+      </html>
+    `);
+    return;
+  }
+
   const filePath = path.normalize(path.join(PUBLIC_DIR, url));
 
   // Security: prevent path traversal outside public/
