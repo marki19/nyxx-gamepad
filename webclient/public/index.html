@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Nyxx Controller</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Connection overlay ──────────────────────────── -->
+  <div id="overlay" class="overlay">
+    <div class="overlay-card">
+      <div class="brand-logo">
+        <span class="brand-n">N</span><span class="brand-rest">YXX</span>
+      </div>
+      <div class="brand-sub">WEB CONTROLLER</div>
+      <div id="overlay-status" class="overlay-status">Connecting to server…</div>
+      <div id="overlay-detail" class="overlay-detail"></div>
+      <button id="btn-retry" class="btn-retry hidden">RECONNECT</button>
+    </div>
+  </div>
+
+  <!-- ── Main gamepad UI ─────────────────────────────── -->
+  <div id="gamepad" class="gamepad hidden">
+
+    <!-- TOP ROW: shoulder buttons & utility bar -->
+    <div class="top-row">
+
+      <div class="shoulder-group shoulder-group--left">
+        <button id="btn-lb" class="btn-shoulder" data-bit="0x0100">LB</button>
+        <button id="btn-lt" class="btn-trigger" data-trigger="lt">LT</button>
+      </div>
+
+      <div class="util-bar">
+        <div id="conn-badge" class="conn-badge conn-badge--ok">● P1</div>
+        <button id="btn-gyro" class="btn-util">GYRO OFF</button>
+        <button id="btn-calibrate" class="btn-util btn-util--dim hidden">CALIBRATE</button>
+      </div>
+
+      <div class="shoulder-group shoulder-group--right">
+        <button id="btn-rt" class="btn-trigger" data-trigger="rt">RT</button>
+        <button id="btn-rb" class="btn-shoulder" data-bit="0x0200">RB</button>
+      </div>
+
+    </div><!-- /top-row -->
+
+    <!-- MAIN AREA: left panel / center / right panel -->
+    <div class="main-area">
+
+      <!-- LEFT PANEL: d-pad + left stick -->
+      <div class="panel panel--left">
+
+        <div class="dpad" id="dpad">
+          <button id="btn-up"    class="dpad-btn dpad-up"    data-bit="0x0001">▲</button>
+          <button id="btn-left"  class="dpad-btn dpad-left"  data-bit="0x0004">◀</button>
+          <div    class="dpad-center"></div>
+          <button id="btn-right" class="dpad-btn dpad-right" data-bit="0x0008">▶</button>
+          <button id="btn-down"  class="dpad-btn dpad-down"  data-bit="0x0002">▼</button>
+        </div>
+
+        <div class="stick-zone" id="zone-left">
+          <div class="stick-ring">
+            <div class="stick-knob" id="knob-left"></div>
+          </div>
+          <button class="stick-click" id="btn-l3" data-bit="0x0040">L3</button>
+        </div>
+
+      </div><!-- /panel left -->
+
+      <!-- CENTER: back / guide / start -->
+      <div class="panel panel--center">
+        <button id="btn-back"  class="btn-meta" data-bit="0x0020">☰</button>
+        <button id="btn-guide" class="btn-guide" data-bit="0x0400">●</button>
+        <button id="btn-start" class="btn-meta" data-bit="0x0010">≡</button>
+      </div>
+
+      <!-- RIGHT PANEL: face buttons + right stick -->
+      <div class="panel panel--right">
+
+        <div class="face-btns">
+          <button id="btn-y" class="face-btn face-y" data-bit="0x8000">Y</button>
+          <div class="face-row-mid">
+            <button id="btn-x" class="face-btn face-x" data-bit="0x4000">X</button>
+            <button id="btn-b" class="face-btn face-b" data-bit="0x2000">B</button>
+          </div>
+          <button id="btn-a" class="face-btn face-a" data-bit="0x1000">A</button>
+        </div>
+
+        <div class="stick-zone" id="zone-right">
+          <div class="stick-ring">
+            <div class="stick-knob" id="knob-right"></div>
+          </div>
+          <button class="stick-click" id="btn-r3" data-bit="0x0080">R3</button>
+        </div>
+
+      </div><!-- /panel right -->
+
+    </div><!-- /main-area -->
+
+  </div><!-- /gamepad -->
+
+  <script src="ws.js"></script>
+  <script src="gyro.js"></script>
+  <script src="gamepad.js"></script>
+</body>
+</html>

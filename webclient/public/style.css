@@ -1,0 +1,292 @@
+/* ── Reset & base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0a0a;
+  --surface:   #161616;
+  --surface2:  #1f1f1f;
+  --border:    #2a2a2a;
+  --text:      #e4e4e4;
+  --muted:     #5a5a5a;
+  --accent:    #ffffff;
+  --ok:        #4ade80;
+  --danger:    #f87171;
+  --dpad-size: 120px;
+  --stick-r:   68px;      /* ring radius */
+  --knob-r:    28px;      /* knob radius */
+  --face-btn:  52px;
+  --shoulder-h: 38px;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button { border: none; cursor: pointer; background: none; color: inherit; font: inherit; touch-action: none; }
+
+.hidden { display: none !important; }
+
+/* ── Connection overlay ────────────────────────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+
+.overlay-card {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 40px 48px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+}
+
+.brand-logo {
+  font-size: 48px; font-weight: 900; letter-spacing: 6px; line-height: 1;
+}
+.brand-n    { color: var(--accent); }
+.brand-rest { color: var(--muted); }
+
+.brand-sub  { font-size: 11px; letter-spacing: 5px; color: var(--muted); margin-top: -4px; }
+
+.overlay-status { font-size: 14px; color: var(--muted); margin-top: 16px; }
+.overlay-detail { font-size: 12px; color: var(--danger); min-height: 16px; }
+
+.btn-retry {
+  margin-top: 8px; padding: 10px 28px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12px; letter-spacing: 2px;
+  color: var(--text);
+  transition: background .15s;
+}
+.btn-retry:active { background: var(--border); }
+
+/* ── Gamepad shell ─────────────────────────────────────────────────────── */
+.gamepad {
+  width: 100vw; height: 100dvh;
+  display: flex; flex-direction: column;
+  padding: 6px 10px 8px;
+  gap: 4px;
+}
+
+/* ── Top row ───────────────────────────────────────────────────────────── */
+.top-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-shrink: 0;
+}
+
+.shoulder-group {
+  display: flex; gap: 6px; align-items: center;
+}
+
+.btn-shoulder {
+  height: var(--shoulder-h); min-width: 56px; padding: 0 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; font-weight: 600; letter-spacing: 1px;
+  color: var(--text);
+  transition: background .08s, border-color .08s;
+}
+.btn-shoulder.pressed,
+.btn-shoulder:active {
+  background: var(--surface2); border-color: #444;
+  color: var(--accent);
+}
+
+.btn-trigger {
+  height: var(--shoulder-h); min-width: 56px; padding: 0 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; font-weight: 600; letter-spacing: 1px;
+  color: var(--muted);
+  transition: background .08s, color .08s;
+}
+.btn-trigger.pressed,
+.btn-trigger:active {
+  background: #2a2a2a; color: var(--accent);
+}
+
+/* Utility bar (center of top row) */
+.util-bar {
+  display: flex; align-items: center; gap: 8px; flex: 1;
+  justify-content: center;
+}
+
+.conn-badge {
+  font-size: 11px; letter-spacing: 1px; padding: 3px 10px;
+  border-radius: 20px; font-weight: 700;
+}
+.conn-badge--ok         { color: var(--ok);    background: rgba(74,222,128,.1);  border: 1px solid rgba(74,222,128,.3);  }
+.conn-badge--connecting { color: #facc15;  background: rgba(250,204,21,.08);  border: 1px solid rgba(250,204,21,.2);  }
+.conn-badge--error      { color: var(--danger); background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.25); }
+
+.btn-util {
+  height: 28px; padding: 0 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; font-size: 10px; letter-spacing: 1.5px; font-weight: 600;
+  color: var(--muted);
+  transition: background .1s, color .1s;
+}
+.btn-util:active, .btn-util.active {
+  background: var(--surface2); color: var(--ok);
+  border-color: rgba(74,222,128,.4);
+}
+.btn-util--dim { color: #3a3a3a; }
+
+/* ── Main area ─────────────────────────────────────────────────────────── */
+.main-area {
+  flex: 1; display: flex; align-items: center;
+  gap: 0; min-height: 0;
+}
+
+/* ── Panels ────────────────────────────────────────────────────────────── */
+.panel {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-around;
+  flex: 1; height: 100%;
+  padding: 6px 0;
+  gap: 10px;
+}
+
+.panel--center {
+  flex: 0 0 auto;
+  width: 90px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ── D-Pad ─────────────────────────────────────────────────────────────── */
+.dpad {
+  position: relative;
+  width: var(--dpad-size); height: var(--dpad-size);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+
+.dpad-btn {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; font-size: 14px; color: var(--muted);
+  transition: background .08s, color .08s;
+}
+.dpad-up    { grid-column: 2; grid-row: 1; border-radius: 6px 6px 2px 2px; }
+.dpad-left  { grid-column: 1; grid-row: 2; border-radius: 6px 2px 2px 6px; }
+.dpad-center { grid-column: 2; grid-row: 2; background: var(--surface); border: 1px solid var(--border); border-radius: 2px; pointer-events: none; }
+.dpad-right { grid-column: 3; grid-row: 2; border-radius: 2px 6px 6px 2px; }
+.dpad-down  { grid-column: 2; grid-row: 3; border-radius: 2px 2px 6px 6px; }
+
+.dpad-btn.pressed,
+.dpad-btn:active { background: var(--surface2); color: var(--accent); }
+
+/* ── Analog sticks ─────────────────────────────────────────────────────── */
+.stick-zone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+
+.stick-ring {
+  position: relative;
+  width:  calc(var(--stick-r) * 2);
+  height: calc(var(--stick-r) * 2);
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.6);
+}
+
+.stick-knob {
+  position: absolute;
+  width:  calc(var(--knob-r) * 2);
+  height: calc(var(--knob-r) * 2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #3a3a3a, #1a1a1a);
+  border: 2px solid #444;
+  top:  50%; left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0,0,0,.7);
+  pointer-events: none;
+  transition: box-shadow .08s;
+}
+
+.stick-ring.active .stick-knob {
+  box-shadow: 0 2px 12px rgba(255,255,255,.15);
+  border-color: #666;
+}
+
+.stick-click {
+  font-size: 10px; letter-spacing: 1.5px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 10px;
+}
+.stick-click.pressed,
+.stick-click:active { background: var(--surface2); color: var(--accent); }
+
+/* ── Center: meta buttons ──────────────────────────────────────────────── */
+.btn-meta {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: 16px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .08s, color .08s;
+}
+.btn-meta.pressed, .btn-meta:active {
+  background: var(--surface2); color: var(--accent);
+}
+
+.btn-guide {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--surface2); border: 2px solid #3a3a3a;
+  font-size: 22px; color: #555;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .08s, color .08s, border-color .08s;
+}
+.btn-guide.pressed, .btn-guide:active {
+  background: #2a2a2a; color: #aaa; border-color: #666;
+}
+
+/* ── Face buttons (ABXY) ───────────────────────────────────────────────── */
+.face-btns {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+}
+
+.face-row-mid { display: flex; gap: 4px; align-items: center; }
+
+.face-btn {
+  width: var(--face-btn); height: var(--face-btn); border-radius: 50%;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid transparent;
+  transition: background .08s, border-color .08s, color .08s, transform .06s;
+}
+.face-btn:active, .face-btn.pressed { transform: scale(.92); }
+
+.face-a { background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.3); color: #4ade80; }
+.face-b { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.3); color: #f87171; }
+.face-x { background: rgba(96,165,250,.08); border-color: rgba(96,165,250,.3); color: #60a5fa; }
+.face-y { background: rgba(250,204,21,.08); border-color: rgba(250,204,21,.3); color: #facc15; }
+
+.face-a.pressed, .face-a:active { background: rgba(74,222,128,.22);  border-color: #4ade80; }
+.face-b.pressed, .face-b:active { background: rgba(248,113,113,.22); border-color: #f87171; }
+.face-x.pressed, .face-x:active { background: rgba(96,165,250,.22);  border-color: #60a5fa; }
+.face-y.pressed, .face-y:active { background: rgba(250,204,21,.22);  border-color: #facc15; }
+
+/* ── Responsive: very short screens ───────────────────────────────────── */
+@media (max-height: 360px) {
+  :root {
+    --dpad-size: 96px;
+    --stick-r:   54px;
+    --knob-r:    22px;
+    --face-btn:  44px;
+    --shoulder-h: 30px;
+  }
+  .btn-util { height: 24px; font-size: 9px; }
+  .panel--center { width: 72px; }
+}
