@@ -131,7 +131,7 @@
 
     btnGyro.addEventListener('click', async () => {
       const on = await window.gyroToggle();
-      btnGyro.textContent  = on ? 'GYRO ON'  : 'GYRO OFF';
+      btnGyro.textContent  = on ? 'DANCE MODE: ON'  : 'DANCE MODE: OFF';
       btnGyro.classList.toggle('active', on);
       btnCal.classList.toggle('hidden', !on);
     });
@@ -227,7 +227,7 @@
       const btnGyro = document.getElementById('btn-gyro');
       const btnCal  = document.getElementById('btn-calibrate');
       if (btnGyro && btnCal) {
-        btnGyro.textContent  = on ? 'GYRO ON'  : 'GYRO OFF';
+        btnGyro.textContent  = on ? 'DANCE MODE: ON'  : 'DANCE MODE: OFF';
         btnGyro.classList.toggle('active', on);
         btnCal.classList.toggle('hidden', !on);
       }
@@ -246,7 +246,7 @@
         const btnGyro = document.getElementById('btn-gyro');
         const btnCal  = document.getElementById('btn-calibrate');
         if (btnGyro && btnCal) {
-          btnGyro.textContent  = on ? 'GYRO ON'  : 'GYRO OFF';
+          btnGyro.textContent  = on ? 'DANCE MODE: ON'  : 'DANCE MODE: OFF';
           btnGyro.classList.toggle('active', on);
           btnCal.classList.toggle('hidden', !on);
         }
