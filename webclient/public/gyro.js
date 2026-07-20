@@ -47,12 +47,19 @@
     rawBuf.gz = ((g.alpha || 0) * DEG2RAD) - calibrated.gz;
 
     // Filter without scaling (keep raw m/s² and rad/s for Just Dance compatibility)
-    smoothed.ax = lp(smoothed.ax, rawBuf.ax, ACCEL_DEADZONE);
-    smoothed.ay = lp(smoothed.ay, rawBuf.ay, ACCEL_DEADZONE);
-    smoothed.az = lp(smoothed.az, rawBuf.az, ACCEL_DEADZONE);
-    smoothed.gx = lp(smoothed.gx, rawBuf.gx, GYRO_DEADZONE * DEG2RAD);
-    smoothed.gy = lp(smoothed.gy, rawBuf.gy, GYRO_DEADZONE * DEG2RAD);
-    smoothed.gz = lp(smoothed.gz, rawBuf.gz, GYRO_DEADZONE * DEG2RAD);
+    const ALPHA = 0.8;
+    smoothed.ax = (smoothed.ax * ALPHA) + (rawBuf.ax * (1 - ALPHA));
+    smoothed.ay = (smoothed.ay * ALPHA) + (rawBuf.ay * (1 - ALPHA));
+    smoothed.az = (smoothed.az * ALPHA) + (rawBuf.az * (1 - ALPHA));
+    smoothed.gx = (smoothed.gx * ALPHA) + (rawBuf.gx * (1 - ALPHA));
+    smoothed.gy = (smoothed.gy * ALPHA) + (rawBuf.gy * (1 - ALPHA));
+    smoothed.gz = (smoothed.gz * ALPHA) + (rawBuf.gz * (1 - ALPHA));
+
+    // Update debug UI
+    const debugEl = document.getElementById('debug-sensor');
+    if (debugEl) {
+      debugEl.innerText = `A: ${smoothed.ax.toFixed(2)}, ${smoothed.ay.toFixed(2)}, ${smoothed.az.toFixed(2)}\nG: ${smoothed.gx.toFixed(2)}, ${smoothed.gy.toFixed(2)}, ${smoothed.gz.toFixed(2)}`;
+    }
 
     // Write into shared PAD state
     const p = window.PAD;
@@ -94,6 +101,7 @@
         await requestPermission();
         window.addEventListener('devicemotion', onMotion, { passive: true });
         enabled = true;
+        window.PAD.hasMotion = true;
         
         // Auto calibrate every 20 seconds to prevent drift during Just Dance
         if (autoCalTimer) clearInterval(autoCalTimer);
