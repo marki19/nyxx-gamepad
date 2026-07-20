@@ -260,7 +260,7 @@ namespace NativeGamepadServer
                             AppendLog($"DSU/Cemuhook failed to start. Port {dsuPort} or {dsuPort + 1} may be in use.");
                         }
 
-                        StartNodeBridge();
+                        StartNodeBridge(port);
                     }
                 }
                 else
@@ -498,7 +498,7 @@ namespace NativeGamepadServer
             base.OnClosed(e);
         }
 
-        private void StartNodeBridge()
+        private void StartNodeBridge(int port)
         {
             try
             {
@@ -521,11 +521,11 @@ namespace NativeGamepadServer
                 {
                     nodeBridgeProcess = new System.Diagnostics.Process();
                     nodeBridgeProcess.StartInfo.FileName = "node";
-                    nodeBridgeProcess.StartInfo.Arguments = "server.js";
+                    nodeBridgeProcess.StartInfo.Arguments = $"server.js {port}";
                     nodeBridgeProcess.StartInfo.WorkingDirectory = bridgeDir;
                     nodeBridgeProcess.StartInfo.UseShellExecute = true; // Open in a new console window so user sees QR code
                     nodeBridgeProcess.Start();
-                    AppendLog("Node web bridge auto-started.");
+                    AppendLog($"Node web bridge auto-started on port {port}.");
                 }
                 else
                 {
