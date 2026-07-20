@@ -133,8 +133,8 @@ wss.on('connection', (ws, req) => {
   // WebSocket → UDP  (relay browser data to C# server)
   ws.on('message', (data, isBinary) => {
     if (isBinary) {
-      // Binary gamepad state packet — forward verbatim
-      udp.send(Buffer.from(data), GAMEPAD_PORT, GAMEPAD_HOST);
+      // Binary gamepad state packet — forward verbatim (data is already a Buffer)
+      udp.send(data, GAMEPAD_PORT, GAMEPAD_HOST);
     } else {
       // Text command (only "PING" expected)
       const text = data.toString().trim();

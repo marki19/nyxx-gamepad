@@ -41,11 +41,14 @@ let _reconnectTimer = null;
 const clamp16 = (v) => Math.max(-32768, Math.min(32767, v | 0));
 const clamp8  = (v) => Math.max(0,      Math.min(255,   v | 0));
 
+// Pre-allocate a single buffer to prevent garbage collection pauses (max 39 bytes)
+const _packBuf = new ArrayBuffer(39);
+const _packView = new DataView(_packBuf);
+
 function packPacket() {
   const p = window.PAD;
   const size = p.hasMotion ? 39 : 15;
-  const buf  = new ArrayBuffer(size);
-  const v    = new DataView(buf);
+  const v = _packView;
 
   v.setUint8 (0,  1);
   v.setUint16(1,  p.seq++ & 0xFFFF,  false); // big-endian
@@ -65,22 +68,24 @@ function packPacket() {
     v.setFloat32(31, p.gyroY,  false);
     v.setFloat32(35, p.gyroZ,  false);
   }
-  return buf;
+  
+  // Return a slice (view) of the exact size we need to send
+  return _packBuf.slice(0, size);
 }
 
-// ── Send loop (60 Hz via rAF) ──────────────────────────────────────────────
+// ── Send loop (100 Hz via setInterval) ─────────────────────────────────────
+let _sendTimer = null;
 function startSendLoop() {
-  function loop() {
+  if (_sendTimer) clearInterval(_sendTimer);
+  _sendTimer = setInterval(() => {
     if (_connected && _ws && _ws.readyState === WebSocket.OPEN) {
       _ws.send(packPacket());
     }
-    _rafHandle = requestAnimationFrame(loop);
-  }
-  _rafHandle = requestAnimationFrame(loop);
+  }, 10); // 10ms = 100Hz, avoids requestAnimationFrame display throttling
 }
 
 function stopSendLoop() {
-  if (_rafHandle !== null) { cancelAnimationFrame(_rafHandle); _rafHandle = null; }
+  if (_sendTimer !== null) { clearInterval(_sendTimer); _sendTimer = null; }
 }
 
 // ── Rumble ─────────────────────────────────────────────────────────────────
