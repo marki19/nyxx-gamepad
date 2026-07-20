@@ -97,11 +97,11 @@ function emit(type, detail) {
 }
 
 // ── WebSocket lifecycle ────────────────────────────────────────────────────
-function connect() {
+function connect(ip, port) {
   clearTimeout(_reconnectTimer);
   emit('status', { state: 'connecting' });
 
-  const url = `wss://${window.location.host}`;
+  const url = `wss://${ip}:${port}`;
   _ws = new WebSocket(url);
   _ws.binaryType = 'arraybuffer';
 
@@ -134,7 +134,10 @@ function connect() {
   _ws.onclose = () => {
     _cleanup();
     emit('status', { state: 'disconnected' });
-    _reconnectTimer = setTimeout(connect, 3000);
+    // Auto-reconnect using last known IP/port
+    const ip   = localStorage.getItem('nyxx-ip')   || '';
+    const port = localStorage.getItem('nyxx-port')  || '5001';
+    if (ip) _reconnectTimer = setTimeout(() => connect(ip, port), 3000);
   };
 
   _ws.onerror = () => {};
@@ -146,12 +149,20 @@ function _cleanup() {
   clearInterval(_pingTimer); _pingTimer = null;
 }
 
-// ── Manual reconnect (called by retry button) ──────────────────────────────
+// ── Manual connect (called by gamepad.js connect form) ─────────────────────
+window.nyxxConnect = function (ip, port) {
+  localStorage.setItem('nyxx-ip',   ip);
+  localStorage.setItem('nyxx-port', port || '5001');
+  if (_ws) { try { _ws.close(); } catch {} }
+  connect(ip, port || '5001');
+};
+
+// ── Manual reconnect (retry button / change IP → go back to form) ──────────
 window.nyxxReconnect = function () {
   clearTimeout(_reconnectTimer);
   if (_ws) { try { _ws.close(); } catch {} }
-  connect();
+  emit('showConnect', {});
 };
 
-// ── Boot ───────────────────────────────────────────────────────────────────
-connect();
+// ── Boot: do NOT auto-connect — wait for user to enter IP ─────────────────
+// (gamepad.js will call window.nyxxConnect after form submit)

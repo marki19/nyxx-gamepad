@@ -13,14 +13,43 @@
 
   <!-- ── Connection overlay ──────────────────────────── -->
   <div id="overlay" class="overlay">
-    <div class="overlay-card">
+    <!-- ── Connect screen ── -->
+    <div id="screen-connect" class="overlay-card">
       <div class="brand-logo">
         <span class="brand-n">N</span><span class="brand-rest">YXX</span>
       </div>
       <div class="brand-sub">WEB CONTROLLER</div>
-      <div id="overlay-status" class="overlay-status">Connecting to server…</div>
+
+      <div class="connect-form">
+        <label class="form-label">PC Bridge IP Address</label>
+        <input id="inp-ip" class="form-input" type="text"
+               inputmode="decimal" placeholder="192.168.x.x"
+               autocomplete="off" spellcheck="false" />
+
+        <label class="form-label" style="margin-top:10px">Port</label>
+        <input id="inp-port" class="form-input form-input--port" type="number"
+               value="5001" min="1" max="65535" />
+
+        <button id="btn-connect" class="btn-connect">CONNECT</button>
+      </div>
+
+      <div class="cert-tip">
+        <span class="cert-tip-icon">ⓘ</span>
+        First time on this device: open
+        <span id="cert-link" class="cert-link">https://&lt;ip&gt;:5001</span>
+        in your phone browser and tap <em>Advanced → Proceed</em>.
+      </div>
+    </div>
+
+    <!-- ── Connecting / error screen ── -->
+    <div id="screen-status" class="overlay-card hidden">
+      <div class="brand-logo">
+        <span class="brand-n">N</span><span class="brand-rest">YXX</span>
+      </div>
+      <div class="brand-sub">WEB CONTROLLER</div>
+      <div id="overlay-status" class="overlay-status">Connecting…</div>
       <div id="overlay-detail" class="overlay-detail"></div>
-      <button id="btn-retry" class="btn-retry hidden">RECONNECT</button>
+      <button id="btn-retry" class="btn-retry hidden">CHANGE IP</button>
     </div>
   </div>
 

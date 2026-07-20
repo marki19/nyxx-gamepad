@@ -144,48 +144,87 @@
     });
   }
 
-  // ── Connection status UI ──────────────────────────────────────────────────
-  const overlay     = document.getElementById('overlay');
-  const gamepadEl   = document.getElementById('gamepad');
+  // ── Connection status UI ───────────────────────────────────────────────
+  const overlay       = document.getElementById('overlay');
+  const screenConnect = document.getElementById('screen-connect');
+  const screenStatus  = document.getElementById('screen-status');
+  const gamepadEl     = document.getElementById('gamepad');
   const overlayStatus = document.getElementById('overlay-status');
   const overlayDetail = document.getElementById('overlay-detail');
-  const retryBtn    = document.getElementById('btn-retry');
-  const badge       = document.getElementById('conn-badge');
+  const retryBtn      = document.getElementById('btn-retry');
+  const badge         = document.getElementById('conn-badge');
+
+  // ── Connect form ──
+  const inpIp    = document.getElementById('inp-ip');
+  const inpPort  = document.getElementById('inp-port');
+  const btnConn  = document.getElementById('btn-connect');
+  const certLink = document.getElementById('cert-link');
+
+  // Pre-fill from localStorage
+  inpIp.value   = localStorage.getItem('nyxx-ip')   || '';
+  inpPort.value = localStorage.getItem('nyxx-port')  || '5001';
+
+  function updateCertLink() {
+    const ip   = inpIp.value.trim();
+    const port = inpPort.value.trim() || '5001';
+    certLink.textContent = ip ? `https://${ip}:${port}` : `https://<ip>:${port}`;
+  }
+  inpIp.addEventListener('input',   updateCertLink);
+  inpPort.addEventListener('input',  updateCertLink);
+  updateCertLink();
+
+  function showConnectScreen() {
+    overlay.classList.remove('hidden');
+    gamepadEl.classList.add('hidden');
+    screenConnect.classList.remove('hidden');
+    screenStatus.classList.add('hidden');
+  }
+
+  function showStatusScreen(msg, detail, showRetry) {
+    overlay.classList.remove('hidden');
+    gamepadEl.classList.add('hidden');
+    screenConnect.classList.add('hidden');
+    screenStatus.classList.remove('hidden');
+    overlayStatus.textContent = msg;
+    overlayDetail.textContent = detail || '';
+    retryBtn.classList.toggle('hidden', !showRetry);
+  }
+
+  btnConn.addEventListener('click', () => {
+    const ip   = inpIp.value.trim();
+    const port = inpPort.value.trim() || '5001';
+    if (!ip) { inpIp.focus(); return; }
+    window.nyxxConnect(ip, port);
+  });
+
+  // Allow Enter key in IP field
+  inpIp.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnConn.click(); });
 
   retryBtn.addEventListener('click', () => window.nyxxReconnect());
 
   window.addEventListener('nyxx:status', ({ detail }) => {
     if (detail.state === 'connecting') {
-      overlay.classList.remove('hidden');
-      gamepadEl.classList.add('hidden');
-      overlayStatus.textContent = 'Connecting to server…';
-      overlayDetail.textContent = '';
-      retryBtn.classList.add('hidden');
-      badge.className = 'conn-badge conn-badge--connecting';
+      showStatusScreen('Connecting to server…', '', false);
+      badge.className  = 'conn-badge conn-badge--connecting';
       badge.textContent = '● …';
     } else if (detail.state === 'disconnected') {
-      overlay.classList.remove('hidden');
-      gamepadEl.classList.add('hidden');
-      overlayStatus.textContent = 'Disconnected. Retrying…';
-      overlayDetail.textContent = '';
-      retryBtn.classList.remove('hidden');
+      showStatusScreen('Disconnected. Retrying…', '', true);
     }
   });
 
   window.addEventListener('nyxx:connected', ({ detail }) => {
     overlay.classList.add('hidden');
     gamepadEl.classList.remove('hidden');
-    badge.className = 'conn-badge conn-badge--ok';
+    badge.className  = 'conn-badge conn-badge--ok';
     badge.textContent = `● P${detail.player}`;
   });
 
   window.addEventListener('nyxx:error', ({ detail }) => {
-    overlay.classList.remove('hidden');
-    gamepadEl.classList.add('hidden');
-    overlayStatus.textContent = 'Could not connect.';
-    overlayDetail.textContent = detail.msg;
-    retryBtn.classList.remove('hidden');
+    showStatusScreen('Could not connect.', detail.msg, true);
   });
+
+  // "Change IP" retry goes back to connect form
+  window.addEventListener('nyxx:showConnect', () => showConnectScreen());
 
   // ── Init ──────────────────────────────────────────────────────────────────
   initStick('left',  'zone-left',  'knob-left');
