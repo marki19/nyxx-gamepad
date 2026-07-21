@@ -94,3 +94,4 @@ This project is licensed under the [MIT License](LICENSE).
 This project was proudly **AI-assisted**, using advanced agentic tools to rapidly prototype, build, and deploy the entire hardware-emulation stack from scratch.
 
 Nyxx utilizes the excellent **ViGEmBus** driver (Copyright © Nefarius Software Solutions e.U.) for Windows gamepad emulation. Please see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) for license details.
+hehe
