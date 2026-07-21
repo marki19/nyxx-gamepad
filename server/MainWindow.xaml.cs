@@ -27,7 +27,7 @@ namespace NativeGamepadServer
         private GamepadServer server;
         private DiscoveryServer? discoveryServer;
         private System.Windows.Forms.NotifyIcon? notifyIcon;
-        private System.Diagnostics.Process? nodeBridgeProcess;
+
 
         public MainWindow()
         {
@@ -226,7 +226,7 @@ namespace NativeGamepadServer
             {
                 server.Stop();
                 discoveryServer?.Stop();
-                StopNodeBridge();
+
                 btnToggle.Content = "START SERVER";
                 btnToggle.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888888"));
                 txtPort.IsEnabled = true;
@@ -260,7 +260,7 @@ namespace NativeGamepadServer
                             AppendLog($"DSU/Cemuhook failed to start. Port {dsuPort} or {dsuPort + 1} may be in use.");
                         }
 
-                        StartNodeBridge(port);
+
                     }
                 }
                 else
@@ -489,7 +489,7 @@ namespace NativeGamepadServer
             {
                 server.Stop();
             }
-            StopNodeBridge();
+
             if (notifyIcon != null)
             {
                 notifyIcon.Visible = false;
@@ -498,55 +498,7 @@ namespace NativeGamepadServer
             base.OnClosed(e);
         }
 
-        private void StartNodeBridge(int port)
-        {
-            try
-            {
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string? bridgeDir = null;
-                
-                DirectoryInfo? current = new DirectoryInfo(baseDir);
-                while (current != null)
-                {
-                    string potentialDir = Path.Combine(current.FullName, "webclient", "bridge");
-                    if (File.Exists(Path.Combine(potentialDir, "server.js")))
-                    {
-                        bridgeDir = potentialDir;
-                        break;
-                    }
-                    current = current.Parent;
-                }
 
-                if (bridgeDir != null)
-                {
-                    nodeBridgeProcess = new System.Diagnostics.Process();
-                    nodeBridgeProcess.StartInfo.FileName = "node";
-                    nodeBridgeProcess.StartInfo.Arguments = $"server.js {port}";
-                    nodeBridgeProcess.StartInfo.WorkingDirectory = bridgeDir;
-                    nodeBridgeProcess.StartInfo.UseShellExecute = true; // Open in a new console window so user sees QR code
-                    nodeBridgeProcess.Start();
-                    AppendLog($"Node web bridge auto-started on port {port}.");
-                }
-                else
-                {
-                    AppendLog("Could not find webclient/bridge/server.js to auto-start the web controller bridge.");
-                }
-            }
-            catch (Exception ex)
-            {
-                AppendLog("Failed to auto-start node bridge: " + ex.Message);
-            }
-        }
-
-        private void StopNodeBridge()
-        {
-            if (nodeBridgeProcess != null)
-            {
-                try { if (!nodeBridgeProcess.HasExited) nodeBridgeProcess.Kill(); } catch { }
-                nodeBridgeProcess = null;
-                AppendLog("Node web bridge stopped.");
-            }
-        }
     }
 }
 

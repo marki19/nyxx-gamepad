@@ -133,7 +133,12 @@ namespace NativeGamepadServer
                 
                 var delay = (int)(next - sw.ElapsedMilliseconds);
                 if (delay > 0) {
-                    try { await Task.Delay(delay, token); } catch { break; }
+                    if (delay > 15) {
+                        try { await Task.Delay(delay - 10, token); } catch { break; }
+                    }
+                    while (sw.ElapsedMilliseconds < next) {
+                        Thread.SpinWait(10);
+                    }
                 }
                 next += periodMs;
             }
