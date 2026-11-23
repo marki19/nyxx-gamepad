@@ -131,6 +131,188 @@
       letter-spacing: 1px;
     }
 
+    /* Bluetooth Prompt Modal Overlay */
+    .bt-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 12, 16, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      padding: 16px;
+    }
+
+    .bt-modal-backdrop.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .bt-modal-card {
+      background: #12161F;
+      border: 1.5px solid #1F2833;
+      border-radius: 16px;
+      padding: 22px 24px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(102, 252, 241, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: modalPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes modalPop {
+      0% { transform: scale(0.92); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .bt-icon-wrapper {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: rgba(102, 252, 241, 0.12);
+      border: 1.5px solid #45A29E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    .bt-icon-wrapper.pulsing::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid #66FCF1;
+      opacity: 0.6;
+      animation: pulseRing 1.8s infinite;
+    }
+
+    .bt-icon-wrapper.disabled {
+      background: rgba(255, 92, 92, 0.12);
+      border-color: #FF5C5C;
+    }
+
+    @keyframes pulseRing {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      70% { transform: scale(1.3); opacity: 0; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+
+    .bt-icon {
+      width: 26px;
+      height: 26px;
+      fill: #66FCF1;
+    }
+
+    .bt-icon-wrapper.disabled .bt-icon {
+      fill: #FF5C5C;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .modal-subtitle {
+      font-size: 12px;
+      color: #8B949E;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .bt-notice {
+      width: 100%;
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: none;
+      font-family: monospace;
+      line-height: 1.4;
+      text-align: left;
+    }
+
+    .bt-notice.error {
+      display: block;
+      background: rgba(255, 92, 92, 0.12);
+      border: 1px solid rgba(255, 92, 92, 0.4);
+      color: #FF7B7B;
+    }
+
+    .bt-notice.info {
+      display: block;
+      background: rgba(102, 252, 241, 0.1);
+      border: 1px solid rgba(102, 252, 241, 0.3);
+      color: #66FCF1;
+    }
+
+    .btn-modal-action {
+      width: 100%;
+      height: 44px;
+      background: #66FCF1;
+      color: #0B0C10;
+      font-size: 13px;
+      font-weight: 800;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      border: none;
+    }
+
+    .btn-modal-action:active {
+      transform: scale(0.97);
+      background: #45A29E;
+    }
+
+    .modal-options {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #8B949E;
+    }
+
+    .chk-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn-modal-dismiss {
+      background: transparent;
+      border: none;
+      color: #8B949E;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 4px 6px;
+      text-decoration: underline;
+    }
+
+    .btn-modal-dismiss:hover {
+      color: #E6EDF3;
+    }
+
     .live-readout {
       font-family: monospace;
       font-size: 11px;
@@ -406,6 +588,34 @@
     </section>
   </main>
 
+  <!-- BLUETOOTH ON/CONNECT MODAL PROMPT -->
+  <div id="btModal" class="bt-modal-backdrop">
+    <div class="bt-modal-card">
+      <div id="btIconWrapper" class="bt-icon-wrapper pulsing">
+        <svg class="bt-icon" viewBox="0 0 24 24">
+          <path d="M12 2a1 1 0 0 1 1 1v7.59l4.3-4.3a1 1 0 0 1 1.4 1.42L14.42 12l4.28 4.29a1 1 0 0 1-1.4 1.42L13 13.41V21a1 1 0 0 1-2 0v-7.59l-4.3 4.3a1 1 0 0 1-1.4-1.42L9.58 12 5.3 7.71a1 1 0 0 1 1.4-1.42L11 10.59V3a1 1 0 0 1 1-1zm-1 9.41V4.41L7.71 7.7 11 11.41zm2 0 3.29-3.71L13 4.41v7zm0 1.18v7l3.29-3.29L13 12.59zm-2 0-3.29 3.71L11 19.59v-7z"/>
+        </svg>
+      </div>
+      <h2 id="modalTitle" class="modal-title">Connect Robot Car</h2>
+      <p id="modalSubtitle" class="modal-subtitle">
+        Turn <strong>ON Bluetooth</strong> on your phone/PC, then tap Find Device to pair with your JDY-16 car.
+      </p>
+      <div id="btNotice" class="bt-notice"></div>
+      <button id="btnModalAction" class="btn-modal-action">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <path d="M12 2a1 1 0 0 1 1 1v7.59l4.3-4.3a1 1 0 0 1 1.4 1.42L14.42 12l4.28 4.29a1 1 0 0 1-1.4 1.42L13 13.41V21a1 1 0 0 1-2 0v-7.59l-4.3 4.3a1 1 0 0 1-1.4-1.42L9.58 12 5.3 7.71a1 1 0 0 1 1.4-1.42L11 10.59V3a1 1 0 0 1 1-1zm-1 9.41V4.41L7.71 7.7 11 11.41zm2 0 3.29-3.71L13 4.41v7zm0 1.18v7l3.29-3.29L13 12.59zm-2 0-3.29 3.71L11 19.59v-7z"/>
+        </svg>
+        <span id="btnModalActionText">Find Device</span>
+      </button>
+      <div class="modal-options">
+        <label class="chk-container">
+          <input type="checkbox" id="chkShowAll"> Show all devices
+        </label>
+        <button id="btnDismissModal" class="btn-modal-dismiss">Manual Mode</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ---------- CONSTANTS & UUIDS ----------
     const SERVICE_UUID    = '0000ffe0-0000-1000-8000-00805f9b34fb';
@@ -480,10 +690,30 @@
       }
     }
 
-    // ---------- BLUETOOTH CONNECTION ----------
+    // ---------- BLUETOOTH CONNECTION & PROMPT ----------
     const btnConnect = document.getElementById('btnConnect');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
+
+    const btModal = document.getElementById('btModal');
+    const btIconWrapper = document.getElementById('btIconWrapper');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+    const btNotice = document.getElementById('btNotice');
+    const btnModalAction = document.getElementById('btnModalAction');
+    const btnModalActionText = document.getElementById('btnModalActionText');
+    const btnDismissModal = document.getElementById('btnDismissModal');
+    const chkShowAll = document.getElementById('chkShowAll');
+
+    function showModal() {
+      btModal.classList.remove('hidden');
+      checkBtStatus();
+    }
+
+    function hideModal() {
+      btModal.classList.add('hidden');
+    }
+
+    btnDismissModal.addEventListener('click', hideModal);
 
     function updateUiConnected(connected, name = 'JDY-16') {
       isConnected = connected;
@@ -491,12 +721,53 @@
         statusDot.className = 'status-dot connected';
         statusText.textContent = `Connected (${name})`;
         btnConnect.textContent = 'Disconnect';
+        hideModal();
       } else {
         statusDot.className = 'status-dot';
         statusText.textContent = 'Disconnected';
         btnConnect.textContent = 'Connect';
         setActiveMode(null);
       }
+    }
+
+    function applyBtState(isAvailable) {
+      if (!isAvailable) {
+        btIconWrapper.className = 'bt-icon-wrapper disabled';
+        btNotice.className = 'bt-notice error';
+        btNotice.innerHTML = '⚠️ <strong>Bluetooth is turned OFF</strong>.<br>Turn ON Bluetooth in your device settings or quick settings panel, then tap Find Device.';
+        btnModalActionText.textContent = 'Check Bluetooth & Find Device';
+      } else {
+        btIconWrapper.className = 'bt-icon-wrapper pulsing';
+        btNotice.className = 'bt-notice info';
+        btNotice.innerHTML = '✓ <strong>Bluetooth is ON</strong>. Tap Find Device to search for your JDY-16 Car.';
+        btnModalActionText.textContent = 'Find Device';
+      }
+    }
+
+    function checkBtStatus() {
+      if (!navigator.bluetooth) {
+        btIconWrapper.className = 'bt-icon-wrapper disabled';
+        btNotice.className = 'bt-notice error';
+        btNotice.textContent = 'Web Bluetooth is not supported on this browser. Please open in Google Chrome (Android/Windows/Mac) or Bluefy (iOS).';
+        btnModalAction.style.display = 'none';
+        return;
+      }
+
+      if (navigator.bluetooth.getAvailability) {
+        navigator.bluetooth.getAvailability().then(available => {
+          applyBtState(available);
+        }).catch(() => {
+          applyBtState(true);
+        });
+      } else {
+        applyBtState(true);
+      }
+    }
+
+    if (navigator.bluetooth && navigator.bluetooth.addEventListener) {
+      navigator.bluetooth.addEventListener('availabilitychanged', (e) => {
+        applyBtState(e.value);
+      });
     }
 
     async function connectBluetooth() {
@@ -513,20 +784,28 @@
       try {
         statusDot.className = 'status-dot connecting';
         statusText.textContent = 'Pairing...';
+        btnModalActionText.textContent = 'Searching...';
 
-        bleDevice = await navigator.bluetooth.requestDevice({
-          filters: [
-            { name: 'JDY-16' },
-            { namePrefix: 'JDY' }
-          ],
-          optionalServices: [SERVICE_UUID]
-        });
+        const showAll = chkShowAll && chkShowAll.checked;
+        const reqOptions = showAll
+          ? { acceptAllDevices: true, optionalServices: [SERVICE_UUID] }
+          : {
+              filters: [
+                { name: 'JDY-16' },
+                { namePrefix: 'JDY' },
+                { namePrefix: 'BT' }
+              ],
+              optionalServices: [SERVICE_UUID]
+            };
+
+        bleDevice = await navigator.bluetooth.requestDevice(reqOptions);
 
         bleDevice.addEventListener('gattserverdisconnected', () => {
           updateUiConnected(false);
         });
 
         statusText.textContent = 'Connecting...';
+        btnModalActionText.textContent = 'Connecting...';
         gattServer = await bleDevice.gatt.connect();
 
         const service = await gattServer.getPrimaryService(SERVICE_UUID);
@@ -540,6 +819,11 @@
       } catch (err) {
         console.error('Connection cancelled or failed:', err);
         updateUiConnected(false);
+        btnModalActionText.textContent = 'Find Device';
+        if (err.name !== 'NotFoundError') {
+          btNotice.className = 'bt-notice error';
+          btNotice.textContent = `Connection error: ${err.message || err}`;
+        }
       }
     }
 
@@ -550,7 +834,19 @@
       updateUiConnected(false);
     }
 
-    btnConnect.addEventListener('click', connectBluetooth);
+    btnConnect.addEventListener('click', () => {
+      if (isConnected) {
+        disconnectBluetooth();
+      } else {
+        showModal();
+        connectBluetooth();
+      }
+    });
+
+    btnModalAction.addEventListener('click', connectBluetooth);
+
+    // Initial check on load
+    checkBtStatus();
 
     // ---------- MODES & TOGGLE-OFF ----------
     let activeModeCmd = null;
