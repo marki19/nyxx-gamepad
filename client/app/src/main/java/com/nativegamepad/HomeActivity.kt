@@ -33,6 +33,16 @@ class HomeActivity : AppCompatActivity() {
     private var bluetoothReceiver: BroadcastReceiver? = null
     private var btAdapter: BluetoothAdapter? = null
 
+    private val enableBtLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            launchArduinoMode(null)
+        } else {
+            Toast.makeText(this, "Please enable Bluetooth to control the car", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun setUpdateButtonState(isUpdateAvailable: Boolean) {
         val tvUpdateText = findViewById<TextView>(R.id.tvUpdateText)
         val ivUpdateIcon = findViewById<ImageView>(R.id.ivUpdateIcon)
@@ -146,7 +156,23 @@ class HomeActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnConnectBluetooth).setOnClickListener {
-            showBluetoothWarningDialog()
+            val manager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = manager?.adapter
+            if (adapter == null) {
+                Toast.makeText(this, "Bluetooth not supported on this device", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!adapter.isEnabled) {
+                try {
+                    @Suppress("DEPRECATION")
+                    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    enableBtLauncher.launch(enableBtIntent)
+                } catch (_: Exception) {
+                    launchArduinoMode(null)
+                }
+            } else {
+                launchArduinoMode(null)
+            }
         }
     }
 
@@ -275,10 +301,12 @@ class HomeActivity : AppCompatActivity() {
         btAdapter?.startDiscovery()
     }
 
-    private fun launchArduinoMode(macAddress: String) {
+    private fun launchArduinoMode(macAddress: String?) {
         val intent = Intent(this, MainActivity::class.java)
         intent.putExtra("CONNECTION_MODE", "ARDUINO")
-        intent.putExtra("MAC_ADDRESS", macAddress)
+        if (!macAddress.isNullOrBlank()) {
+            intent.putExtra("MAC_ADDRESS", macAddress)
+        }
         startActivity(intent)
         finish()
     }

@@ -78,6 +78,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    private val enableBtLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            connectArduinoCar()
+        } else {
+            Toast.makeText(this, "Bluetooth must be turned on to connect to car", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private var btStateReceiver: android.content.BroadcastReceiver? = null
+
     private var sensorManager: SensorManager? = null
     private var gravitySensor: Sensor? = null
     private var accelSensor: Sensor? = null
@@ -139,6 +151,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         })
         
         val mode = intent?.getStringExtra("CONNECTION_MODE") ?: "WIFI"
+
+        // Listen for Bluetooth turned ON to automatically connect
+        val btFilter = android.content.IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        btStateReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    if (state == BluetoothAdapter.STATE_ON && (mode == "ARDUINO" || arduinoSender != null)) {
+                        connectArduinoCar()
+                    }
+                }
+            }
+        }
+        registerReceiver(btStateReceiver, btFilter)
+
         if (mode == "ARDUINO") {
             startArduinoGamepad()
         } else {
@@ -802,12 +829,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             return
         }
         if (!adapter.isEnabled) {
-            Toast.makeText(this, "Please turn on Bluetooth", Toast.LENGTH_SHORT).show()
             try {
                 @Suppress("DEPRECATION")
                 val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                startActivity(enableBtIntent)
-            } catch (_: Exception) {}
+                enableBtLauncher.launch(enableBtIntent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Please turn on Bluetooth", Toast.LENGTH_SHORT).show()
+            }
             return
         }
 
@@ -1461,5 +1489,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         // Background propagation
         drawerLayout?.setBackgroundColor(bgColor)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            btStateReceiver?.let { unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        arduinoSender?.closeConnection()
     }
 }
