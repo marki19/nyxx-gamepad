@@ -207,15 +207,15 @@
                 android:letterSpacing="0.1"
                 android:layout_marginBottom="8dp" />
 
-            <!-- Avoid Distance Slider Container -->
+            <!-- Distance Slider Container -->
             <LinearLayout
                 android:id="@+id/cardDistance"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_dark_card"
-                android:padding="4dp"
-                android:layout_marginBottom="4dp">
+                android:padding="6dp"
+                android:layout_marginBottom="6dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -227,9 +227,9 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Avoid Distance"
+                        android:text="Distance"
                         android:textColor="#C5C6C7"
-                        android:textSize="10sp"
+                        android:textSize="11sp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
@@ -238,7 +238,7 @@
                         android:layout_height="wrap_content"
                         android:text="35 cm"
                         android:textColor="#66FCF1"
-                        android:textSize="10sp"
+                        android:textSize="11sp"
                         android:fontFamily="monospace"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -256,55 +256,6 @@
                     app:trackColorInactive="#22FFFFFF" />
             </LinearLayout>
 
-            <!-- Follow Range Slider Container -->
-            <LinearLayout
-                android:id="@+id/cardFollowDistance"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_dark_card"
-                android:padding="4dp"
-                android:layout_marginBottom="4dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Follow Range"
-                        android:textColor="#C5C6C7"
-                        android:textSize="10sp"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <TextView
-                        android:id="@+id/tvFollowDistanceValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="60 cm"
-                        android:textColor="#66FCF1"
-                        android:textSize="10sp"
-                        android:fontFamily="monospace"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderFollowDistance"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:valueFrom="10.0"
-                    android:valueTo="150.0"
-                    android:stepSize="1.0"
-                    android:value="60.0"
-                    app:thumbColor="#66FCF1"
-                    app:trackColorActive="#45A29E"
-                    app:trackColorInactive="#22FFFFFF" />
-            </LinearLayout>
-
             <!-- Speed Slider Container -->
             <LinearLayout
                 android:id="@+id/cardSpeed"
@@ -312,7 +263,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_dark_card"
-                android:padding="4dp">
+                android:padding="6dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -326,7 +277,7 @@
                         android:layout_weight="1"
                         android:text="Cruise Speed"
                         android:textColor="#C5C6C7"
-                        android:textSize="10sp"
+                        android:textSize="11sp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
@@ -335,7 +286,7 @@
                         android:layout_height="wrap_content"
                         android:text="70 %"
                         android:textColor="#66FCF1"
-                        android:textSize="10sp"
+                        android:textSize="11sp"
                         android:fontFamily="monospace"
                         android:textStyle="bold" />
                 </LinearLayout>

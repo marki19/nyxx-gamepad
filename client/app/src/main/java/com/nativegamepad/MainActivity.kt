@@ -492,10 +492,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val tvDistanceValue = findViewById<TextView>(R.id.tvDistanceValue)
         val sliderDistance = findViewById<Slider>(R.id.sliderDistance)
 
-        val cardFollowDistance = findViewById<LinearLayout>(R.id.cardFollowDistance)
-        val tvFollowDistanceValue = findViewById<TextView>(R.id.tvFollowDistanceValue)
-        val sliderFollowDistance = findViewById<Slider>(R.id.sliderFollowDistance)
-
         val cardSpeed = findViewById<LinearLayout>(R.id.cardSpeed)
         val tvSpeedValue = findViewById<TextView>(R.id.tvSpeedValue)
         val sliderSpeed = findViewById<Slider>(R.id.sliderSpeed)
@@ -508,14 +504,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         val prefs = getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
         val savedDist = prefs.getInt("obstacle_dist", 35).coerceIn(10, 100)
-        val savedFollow = prefs.getInt("follow_range", 60).coerceIn(10, 150)
         val savedSpeed = prefs.getInt("cruise_speed", 70).coerceIn(0, 100)
 
         sliderDistance.value = savedDist.toFloat()
         tvDistanceValue.text = "$savedDist cm"
-
-        sliderFollowDistance.value = savedFollow.toFloat()
-        tvFollowDistanceValue.text = "$savedFollow cm"
 
         sliderSpeed.value = savedSpeed.toFloat()
         tvSpeedValue.text = "$savedSpeed %"
@@ -525,7 +517,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             btnStop.isEnabled = enabled
             btnStop.alpha = if (enabled) 1.0f else 0.5f
             sliderDistance.isEnabled = enabled
-            sliderFollowDistance.isEnabled = enabled
             sliderSpeed.isEnabled = enabled
         }
         setControlsEnabled(false)
@@ -632,34 +623,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         })
 
-        // Follow Range Slider (%C<cm>#) throttling and persistence
-        var lastFollowSendTime = 0L
-        var lastFollowSent = savedFollow
-        sliderFollowDistance.addOnChangeListener { _, value, fromUser ->
-            val dist = value.toInt()
-            tvFollowDistanceValue.text = "$dist cm"
-            if (fromUser && arduinoSender?.isConnected == true) {
-                val now = SystemClock.elapsedRealtime()
-                if (now - lastFollowSendTime >= 100L) {
-                    lastFollowSendTime = now
-                    lastFollowSent = dist
-                    arduinoSender?.sendCommand("%C$dist#")
-                }
-            }
-        }
-        sliderFollowDistance.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
-            override fun onStartTrackingTouch(slider: Slider) {}
-            override fun onStopTrackingTouch(slider: Slider) {
-                val dist = slider.value.toInt()
-                tvFollowDistanceValue.text = "$dist cm"
-                prefs.edit().putInt("follow_range", dist).apply()
-                if (arduinoSender?.isConnected == true && dist != lastFollowSent) {
-                    lastFollowSent = dist
-                    arduinoSender?.sendCommand("%C$dist#")
-                }
-            }
-        })
-
         // Speed Slider throttling and persistence
         var lastSpeedSendTime = 0L
         var lastSpeedSent = savedSpeed
@@ -721,13 +684,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 cardDistance.setBackgroundResource(R.drawable.card_highlight_bg)
             } else {
                 cardDistance.setBackgroundResource(R.drawable.bg_dark_card)
-            }
-
-            // Highlight follow range slider when Object Follow mode is active
-            if (activeCmd == "%F#") {
-                cardFollowDistance.setBackgroundResource(R.drawable.card_highlight_bg)
-            } else {
-                cardFollowDistance.setBackgroundResource(R.drawable.bg_dark_card)
             }
         }
 
@@ -825,15 +781,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
                         // Requirement C: Send initial saved parameters after connecting before enabling modes
                         sliderDistance.isEnabled = true
-                        sliderFollowDistance.isEnabled = true
                         sliderSpeed.isEnabled = true
                         lifecycleScope.launch {
                             val curDist = prefs.getInt("obstacle_dist", 35)
-                            val curFollow = prefs.getInt("follow_range", 60)
                             val curSpd = prefs.getInt("cruise_speed", 70)
                             sender.sendCommand("%D$curDist#")
-                            delay(50L)
-                            sender.sendCommand("%C$curFollow#")
                             delay(50L)
                             sender.sendCommand("%V$curSpd#")
                             delay(50L)
