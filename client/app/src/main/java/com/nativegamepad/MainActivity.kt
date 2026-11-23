@@ -8,17 +8,20 @@ import android.os.BatteryManager
 
 import android.view.View
 import android.view.MotionEvent
+import android.view.HapticFeedbackConstants
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.SeekBar
 import android.widget.Spinner
+import androidx.appcompat.widget.AppCompatButton
+import androidx.appcompat.widget.ListPopupWindow
 import androidx.appcompat.widget.SwitchCompat
 import android.widget.TextView
-import android.widget.ProgressBar
 import android.widget.Toast
 import android.app.AlertDialog
 import android.content.Intent
@@ -40,14 +43,40 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
+import android.os.SystemClock
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.toColorInt
+import com.google.android.material.slider.Slider
+import kotlinx.coroutines.delay
 import kotlin.concurrent.thread
 
+@Suppress("SpellCheckingInspection")
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private var discoveryJob: Job? = null
+    private var activeRobotModeCmd: String? = null
+    private var robotModeJob: Job? = null
+    private var robotCarMac: String? = null
+
+    private val blePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.entries.all { it.value }
+        if (allGranted) {
+            connectArduinoCar()
+        } else {
+            Toast.makeText(this, "Bluetooth permissions required for JDY-16", Toast.LENGTH_LONG).show()
+        }
+    }
 
     private var sensorManager: SensorManager? = null
     private var gravitySensor: Sensor? = null
@@ -69,6 +98,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private var udpSender: UdpSender? = null
     private var bluetoothSender: BluetoothHidSender? = null
+    private var arduinoSender: ArduinoBluetoothManager? = null
     private var gamepadView: GamepadView? = null
     private var drawerLayout: DrawerLayout? = null
 
@@ -100,7 +130,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
                 sensorManager?.unregisterListener(this@MainActivity)
                 udpSender?.stop()
-                bluetoothSender?.stop()
+                arduinoSender?.closeConnection()
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 val intent = Intent(this@MainActivity, HomeActivity::class.java)
                 startActivity(intent)
                 finish()
@@ -108,8 +139,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         })
         
         val mode = intent?.getStringExtra("CONNECTION_MODE") ?: "WIFI"
-        if (mode == "BLUETOOTH") {
-            startBluetoothGamepad()
+        if (mode == "ARDUINO") {
+            startArduinoGamepad()
         } else {
             setupHomePage()
         }
@@ -139,7 +170,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val tvNyxx = findViewById<TextView>(R.id.tvNyxx)
         val tvSubtitle = findViewById<TextView>(R.id.tvSubtitle)
         val btnConnect = findViewById<Button>(R.id.connectButton)
-        val btnBackToHome = findViewById<android.widget.ImageButton>(R.id.btnBackToHome)
+        val btnBackToHome = findViewById<ImageButton>(R.id.btnBackToHome)
 
         val pColor = ThemeConfig.primaryColor
         
@@ -149,18 +180,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         btnBackToHome?.setColorFilter(pColor)
     }
 
+    @android.annotation.SuppressLint("SetTextI18n")
     private fun setupHomePage() {
         setContentView(R.layout.activity_main)
 
         val input = findViewById<EditText>(R.id.ipInput)
         val button = findViewById<Button>(R.id.connectButton)
-        val tvDiscoveryStatus = findViewById<TextView>(R.id.tvDiscoveryStatus)
-        val llDiscoveredServers = findViewById<LinearLayout>(R.id.llDiscoveredServers)
         val btnConnectManually = findViewById<TextView>(R.id.btnConnectManually)
         val layoutManualInput = findViewById<LinearLayout>(R.id.layoutManualInput)
         
         applyTheme()
-        findViewById<TextView>(R.id.tvAppVersion)?.text = "v" + BuildConfig.VERSION_NAME
+        findViewById<TextView>(R.id.tvAppVersion)?.text = "v${BuildConfig.VERSION_NAME}"
 
         val prefs = getSharedPreferences("GamepadPrefs", Context.MODE_PRIVATE)
 
@@ -190,12 +220,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         button?.setOnClickListener {
             val ipString = input?.text?.toString()?.trim() ?: ""
             if (ipString.isNotBlank()) {
-                var ip = ipString
-                var port = 5000
+                val ip: String
+                val port: Int
                 if (ipString.contains(":")) {
                     val parts = ipString.split(":")
                     ip = parts[0]
                     port = parts[1].toIntOrNull() ?: 5000
+                } else {
+                    ip = ipString
+                    port = 5000
                 }
 
                 button.text = "CONNECTING..."
@@ -262,7 +295,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                                 isAllCaps = false
                                 textSize = 14f
                                 setBackgroundResource(R.drawable.btn_premium_card)
-                                setTextColor(android.graphics.Color.WHITE)
+                                setTextColor(Color.WHITE)
                                 setPadding(24, 24, 24, 24)
                                 layoutParams = LinearLayout.LayoutParams(
                                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -289,12 +322,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun startGamepadDirectly(ipWithPort: String, fromAutoIntent: Boolean = false) {
         var ip = ipWithPort
-        var port = 5000
-
-        if (ipWithPort.contains(":")) {
+        val port: Int = if (ipWithPort.contains(":")) {
             val parts = ipWithPort.split(":")
             ip = parts[0]
-            port = parts[1].toIntOrNull() ?: 5000
+            parts[1].toIntOrNull() ?: 5000
+        } else {
+            5000
         }
 
         // Cancel discovery
@@ -352,7 +385,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             runOnUiThread {
                 Toast.makeText(this@MainActivity, "Server disconnected", Toast.LENGTH_SHORT).show()
                 udpSender?.stop()
-                bluetoothSender?.stop()
+                arduinoSender?.closeConnection()
                 val intent = Intent(this@MainActivity, HomeActivity::class.java)
                 startActivity(intent)
                 finish()
@@ -394,25 +427,383 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
 
     @android.annotation.SuppressLint("SetTextI18n")
-    private fun startBluetoothGamepad() {
-        bluetoothSender = BluetoothHidSender(this)
-        bluetoothSender?.onDisconnected = {
-            runOnUiThread {
-                bluetoothSender?.stop()
-                val intent = Intent(this@MainActivity, HomeActivity::class.java)
-                startActivity(intent)
-                finish()
+    private fun startArduinoGamepad() {
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        setContentView(R.layout.activity_robot_car)
+
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val adapter = manager.adapter
+        if (adapter == null) {
+            Toast.makeText(this, "Bluetooth not supported on this device", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this@MainActivity, HomeActivity::class.java)
+            startActivity(intent)
+            finish()
+            return
+        }
+
+        robotCarMac = intent.getStringExtra("MAC_ADDRESS")
+        arduinoSender = ArduinoBluetoothManager(this, adapter)
+
+        setupRobotCarUi()
+        checkAndRequestBlePermissions()
+    }
+
+    @android.annotation.SuppressLint("SetTextI18n")
+    private fun setupRobotCarUi() {
+        val btnBack = findViewById<ImageButton>(R.id.btnBackToHome)
+        val tvStatus = findViewById<TextView>(R.id.tvConnectionStatus)
+        val viewDot = findViewById<View>(R.id.viewStatusDot)
+        val btnReconnect = findViewById<Button>(R.id.btnReconnect)
+
+        val btnAvoid = findViewById<Button>(R.id.btnModeAvoid)
+        val btnFollow = findViewById<Button>(R.id.btnModeFollow)
+        val btnLine = findViewById<Button>(R.id.btnModeLine)
+        val btnLight = findViewById<Button>(R.id.btnModeLight)
+        val btnStop = findViewById<Button>(R.id.btnModeStop)
+
+        val cardDistance = findViewById<LinearLayout>(R.id.cardDistance)
+        val tvDistanceValue = findViewById<TextView>(R.id.tvDistanceValue)
+        val sliderDistance = findViewById<Slider>(R.id.sliderDistance)
+
+        val cardSpeed = findViewById<LinearLayout>(R.id.cardSpeed)
+        val tvSpeedValue = findViewById<TextView>(R.id.tvSpeedValue)
+        val sliderSpeed = findViewById<Slider>(R.id.sliderSpeed)
+
+        val layoutJoystickContainer = findViewById<LinearLayout>(R.id.layoutJoystickContainer)
+        val tvJoystickAngle = findViewById<TextView>(R.id.tvJoystickAngle)
+        val virtualJoystick = findViewById<VirtualJoystickView>(R.id.virtualJoystick)
+
+        val modeButtons = listOf(btnAvoid, btnFollow, btnLine, btnLight)
+
+        val prefs = getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
+        val savedDist = prefs.getInt("obstacle_dist", 35).coerceIn(10, 100)
+        val savedSpeed = prefs.getInt("cruise_speed", 70).coerceIn(0, 100)
+
+        sliderDistance.value = savedDist.toFloat()
+        tvDistanceValue.text = "$savedDist cm"
+
+        sliderSpeed.value = savedSpeed.toFloat()
+        tvSpeedValue.text = "$savedSpeed %"
+
+        fun setControlsEnabled(enabled: Boolean) {
+            modeButtons.forEach { it.isEnabled = enabled; it.alpha = if (enabled) 1.0f else 0.5f }
+            btnStop.isEnabled = enabled
+            btnStop.alpha = if (enabled) 1.0f else 0.5f
+            sliderDistance.isEnabled = enabled
+            sliderSpeed.isEnabled = enabled
+        }
+        setControlsEnabled(false)
+
+        // Interactive Touch Helper with Press Scale and Haptics
+        fun View.applyInteractivePress(onClickAction: (() -> Unit)? = null) {
+            isHapticFeedbackEnabled = true
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(60).start()
+                        v.isPressed = true
+                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(80).start()
+                        v.isPressed = false
+                        if (onClickAction != null) {
+                            v.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+                            onClickAction()
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(80).start()
+                        v.isPressed = false
+                    }
+                }
+                true
             }
         }
-        bluetoothSender?.start()
-        
-        setContentView(R.layout.activity_gamepad)
-        
-        drawerLayout = findViewById(R.id.drawerLayout)
-        gamepadView = findViewById(R.id.gamepadView)
-        gamepadView?.bluetoothSender = bluetoothSender
-        
-        setupGamepadViewInteractions()
+
+        // Hold-to-Drive: Drives while finger is pressed, stops (%S) immediately on release
+        fun setupHoldToDriveButton(button: Button?, driveCmd: String) {
+            button?.apply {
+                isHapticFeedbackEnabled = true
+                setOnTouchListener { v, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            v.animate().scaleX(0.88f).scaleY(0.88f).setDuration(50).start()
+                            v.isPressed = true
+                            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            arduinoSender?.sendCommand(driveCmd)
+                            true
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(80).start()
+                            v.isPressed = false
+                            arduinoSender?.stop()
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            }
+        }
+
+        btnBack.applyInteractivePress {
+            arduinoSender?.sendCommand("%Q")
+            arduinoSender?.closeConnection()
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            val intent = Intent(this@MainActivity, HomeActivity::class.java)
+            startActivity(intent)
+            finish()
+        }
+
+        btnReconnect.applyInteractivePress {
+            connectArduinoCar()
+        }
+
+        // Distance Slider throttling and persistence
+        var lastDistanceSendTime = 0L
+        var lastDistanceSent = savedDist
+        sliderDistance.addOnChangeListener { _, value, fromUser ->
+            val dist = value.toInt()
+            tvDistanceValue.text = "$dist cm"
+            if (fromUser && arduinoSender?.isConnected == true) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastDistanceSendTime >= 100L) {
+                    lastDistanceSendTime = now
+                    lastDistanceSent = dist
+                    arduinoSender?.sendCommand("%D$dist#")
+                }
+            }
+        }
+        sliderDistance.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                val dist = slider.value.toInt()
+                tvDistanceValue.text = "$dist cm"
+                prefs.edit().putInt("obstacle_dist", dist).apply()
+                if (arduinoSender?.isConnected == true && dist != lastDistanceSent) {
+                    lastDistanceSent = dist
+                    arduinoSender?.sendCommand("%D$dist#")
+                }
+            }
+        })
+
+        // Speed Slider throttling and persistence
+        var lastSpeedSendTime = 0L
+        var lastSpeedSent = savedSpeed
+        sliderSpeed.addOnChangeListener { _, value, fromUser ->
+            val spd = value.toInt()
+            tvSpeedValue.text = "$spd %"
+            if (fromUser && arduinoSender?.isConnected == true) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastSpeedSendTime >= 100L) {
+                    lastSpeedSendTime = now
+                    lastSpeedSent = spd
+                    arduinoSender?.sendCommand("%V$spd#")
+                }
+            }
+        }
+        sliderSpeed.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                val spd = slider.value.toInt()
+                tvSpeedValue.text = "$spd %"
+                prefs.edit().putInt("cruise_speed", spd).apply()
+                if (arduinoSender?.isConnected == true && spd != lastSpeedSent) {
+                    lastSpeedSent = spd
+                    arduinoSender?.sendCommand("%V$spd#")
+                }
+            }
+        })
+
+        // Mode Switching
+        fun updateModeSelectionUI(activeCmd: String?) {
+            for (btn in modeButtons) {
+                val isSelected = when (btn.id) {
+                    R.id.btnModeAvoid -> activeCmd == "%A#"
+                    R.id.btnModeFollow -> activeCmd == "%F#"
+                    R.id.btnModeLine -> activeCmd == "%T#"
+                    R.id.btnModeLight -> activeCmd == "%P#"
+                    else -> false
+                }
+                btn.isSelected = isSelected
+                if (isSelected) {
+                    btn.setTextColor(Color.parseColor("#0B0C10"))
+                } else {
+                    btn.setTextColor(Color.parseColor("#EDEEF0"))
+                }
+                btn.refreshDrawableState()
+            }
+
+            // Left movement joystick state in landscape
+            if (activeCmd != null) {
+                tvJoystickAngle?.text = "Auto Active"
+                virtualJoystick?.alpha = 0.5f
+            } else {
+                tvJoystickAngle?.text = "Touch to steer"
+                virtualJoystick?.alpha = 1.0f
+            }
+
+            // Highlight distance slider when Obstacle Avoidance mode is active
+            if (activeCmd == "%A#") {
+                cardDistance.setBackgroundResource(R.drawable.card_highlight_bg)
+            } else {
+                cardDistance.setBackgroundResource(R.drawable.bg_dark_card)
+            }
+        }
+
+        fun toggleMode(targetCmd: String) {
+            if (arduinoSender?.isConnected != true) return
+            robotModeJob?.cancel()
+            // Clicking the active button disables it
+            if (activeRobotModeCmd == targetCmd) {
+                activeRobotModeCmd = null
+                arduinoSender?.sendCommand("%Q")
+                updateModeSelectionUI(null)
+                return
+            }
+            robotModeJob = lifecycleScope.launch {
+                if (activeRobotModeCmd != null) {
+                    arduinoSender?.sendCommand("%Q")
+                    delay(300L)
+                }
+                arduinoSender?.sendCommand(targetCmd)
+                activeRobotModeCmd = targetCmd
+                updateModeSelectionUI(targetCmd)
+            }
+        }
+
+        fun stopAllModesAndMotion() {
+            robotModeJob?.cancel()
+            activeRobotModeCmd = null
+            arduinoSender?.stop()
+            arduinoSender?.sendCommand("%Q")
+            updateModeSelectionUI(null)
+        }
+
+        btnAvoid.applyInteractivePress { toggleMode("%A#") }
+        btnFollow.applyInteractivePress { toggleMode("%F#") }
+        btnLine.applyInteractivePress { toggleMode("%T#") }
+        btnLight.applyInteractivePress { toggleMode("%P#") }
+
+        btnStop.applyInteractivePress {
+            stopAllModesAndMotion()
+        }
+
+        // 360° Virtual Analog Joystick (Left Side)
+        virtualJoystick?.onDirectionChanged = { degree ->
+            tvJoystickAngle?.text = "Steering: $degree°"
+            arduinoSender?.joystick(degree)
+        }
+
+        virtualJoystick?.onReleased = {
+            tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Touch to steer"
+            arduinoSender?.stop()
+        }
+
+        setupHoldToDriveButton(findViewById(R.id.btnSpinLeft), "%L")
+        setupHoldToDriveButton(findViewById(R.id.btnSpinRight), "%R")
+        findViewById<Button>(R.id.btnSpinStop)?.applyInteractivePress {
+            stopAllModesAndMotion()
+        }
+
+        // Observe ConnectionState
+        val sender = arduinoSender ?: return
+        lifecycleScope.launch {
+            sender.connectionState.collect { state ->
+                when (state) {
+                    BleConnectionState.Disconnected -> {
+                        tvStatus.text = "Disconnected"
+                        tvStatus.setTextColor(Color.parseColor("#FF5C5C"))
+                        viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FF5C5C"))
+                        setControlsEnabled(false)
+                        activeRobotModeCmd = null
+                        updateModeSelectionUI(null)
+                    }
+                    BleConnectionState.Scanning -> {
+                        tvStatus.text = "Scanning (JDY-16)..."
+                        tvStatus.setTextColor(Color.parseColor("#FFA500"))
+                        viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
+                        setControlsEnabled(false)
+                    }
+                    BleConnectionState.Connecting -> {
+                        tvStatus.text = "Connecting..."
+                        tvStatus.setTextColor(Color.parseColor("#FFA500"))
+                        viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
+                        setControlsEnabled(false)
+                    }
+                    BleConnectionState.Reconnecting -> {
+                        tvStatus.text = "Reconnecting..."
+                        tvStatus.setTextColor(Color.parseColor("#FFA500"))
+                        viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
+                        setControlsEnabled(false)
+                    }
+                    BleConnectionState.Connected -> {
+                        tvStatus.text = "Connected (JDY-16)"
+                        tvStatus.setTextColor(Color.parseColor("#66FCF1"))
+                        viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#66FCF1"))
+
+                        // Requirement C: Send initial saved parameters after connecting before enabling modes
+                        sliderDistance.isEnabled = true
+                        sliderSpeed.isEnabled = true
+                        lifecycleScope.launch {
+                            val curDist = prefs.getInt("obstacle_dist", 35)
+                            val curSpd = prefs.getInt("cruise_speed", 70)
+                            sender.sendCommand("%D$curDist#")
+                            delay(50L)
+                            sender.sendCommand("%V$curSpd#")
+                            delay(50L)
+                            modeButtons.forEach { it.isEnabled = true; it.alpha = 1.0f }
+                            btnStop.isEnabled = true
+                            btnStop.alpha = 1.0f
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun checkAndRequestBlePermissions() {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missing.isNotEmpty()) {
+            blePermissionLauncher.launch(missing.toTypedArray())
+        } else {
+            connectArduinoCar()
+        }
+    }
+
+    private fun connectArduinoCar() {
+        val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+        if (adapter == null) {
+            Toast.makeText(this, "Bluetooth unavailable", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!adapter.isEnabled) {
+            Toast.makeText(this, "Please turn on Bluetooth", Toast.LENGTH_SHORT).show()
+            try {
+                @Suppress("DEPRECATION")
+                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                startActivity(enableBtIntent)
+            } catch (_: Exception) {}
+            return
+        }
+
+        lifecycleScope.launch {
+            arduinoSender?.connectToCar(robotCarMac)
+        }
     }
 
     private fun setupGamepadViewInteractions() {
@@ -476,7 +867,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         // Preview / Eye toggle
-        val btnEye = floatingBox.findViewById<android.widget.FrameLayout>(R.id.btnPreviewToggle)
+        val btnEye = floatingBox.findViewById<FrameLayout>(R.id.btnPreviewToggle)
         val tvEye = floatingBox.findViewById<ImageView>(R.id.tvEyeIcon)
         val eyeRing = floatingBox.findViewById<View>(R.id.eyeActiveRing)
         val propertiesContent = floatingBox.findViewById<View>(R.id.layoutPropertiesContent)
@@ -490,7 +881,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     ThemeConfig.primaryColor
                 )
                 propertiesContent?.visibility = View.GONE  // hide properties in preview
-            } else {
+                eyeRing?.animate()?.alpha(1f)?.setDuration(150)?.start()
+            } else if (isPreview == false) {
                 // Dim — clearly OFF
                 tvEye?.alpha = 0.35f
                 eyeRing?.animate()?.alpha(0f)?.setDuration(150)?.start()
@@ -509,11 +901,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         updateEyeState(false)
 
         // DONE button — save and exit (onEditModeExited drives all animations)
-        floatingBox.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btnDoneEdit)?.setOnClickListener {
+        floatingBox.findViewById<AppCompatButton>(R.id.btnDoneEdit)?.setOnClickListener {
             view.saveEditMode()
         }
         // CANCEL button — discard and exit
-        floatingBox.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btnCancelAllEdit)?.setOnClickListener {
+        floatingBox.findViewById<AppCompatButton>(R.id.btnCancelAllEdit)?.setOnClickListener {
             view.cancelEditMode()
         }
     }
@@ -700,18 +1092,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             GamepadProfiles.PSP
         )
         
-        val sharedPrefs = getSharedPreferences("GamepadPrefs", android.content.Context.MODE_PRIVATE)
+        val sharedPrefs = getSharedPreferences("GamepadPrefs", Context.MODE_PRIVATE)
         val lastProfileId = sharedPrefs.getString("lastProfile", "nintendo")
         var currentProfile = profiles.find { it.id == lastProfileId } ?: GamepadProfiles.NINTENDO
         
-        val listPopupWindow = androidx.appcompat.widget.ListPopupWindow(this)
+        val listPopupWindow = ListPopupWindow(this)
         listPopupWindow.anchorView = tvSelectedProfile
-        listPopupWindow.verticalOffset = 16 // A little below the display box
-        listPopupWindow.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.parseColor("#15171E")))
+        listPopupWindow.verticalOffset = 16
+        listPopupWindow.setBackgroundDrawable(
+            ColorDrawable("#15171E".toColorInt())
+        )
         
         fun applyProfile(p: GamepadProfile) {
             currentProfile = p
-            tvSelectedProfile?.text = p.displayName
+            tvSelectedProfile.text = p.displayName
             view.setProfile(p)
             udpSender?.state?.joyconType = when (p.id) {
                 "joycon_l" -> 1.toByte() // Left
@@ -720,9 +1114,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
             sharedPrefs.edit { putString("lastProfile", p.id) }
             requestedOrientation = if (p.id == "wii" || p.id == "joycon_l" || p.id == "joycon_r") {
-                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             } else {
-                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             }
             
             val switchGyro = findViewById<SwitchCompat>(R.id.switchGyro)
@@ -765,7 +1159,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             
             // Ensure properties content is hidden until an element is selected
             floatingBox?.findViewById<View>(R.id.layoutPropertiesContent)?.visibility = View.GONE
-            floatingBox?.findViewById<TextView>(R.id.tvSheetTitle)?.text = "Select a button"
+            floatingBox?.findViewById<TextView>(R.id.tvSheetTitle)?.text = getString(R.string.select_a_button)
             
             if (overlay?.visibility != View.VISIBLE) {
                 overlay?.alpha = 0f
@@ -779,8 +1173,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
         
-        findViewById<android.widget.ImageButton>(R.id.btnOpenMenu)?.setOnClickListener {
-            drawerLayout?.openDrawer(androidx.core.view.GravityCompat.START)
+        findViewById<ImageButton>(R.id.btnOpenMenu)?.setOnClickListener {
+            drawerLayout?.openDrawer(GravityCompat.START)
         }
 
         findViewById<Button>(R.id.btnResetLayout).setOnClickListener {
@@ -817,6 +1211,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager?.unregisterListener(this)
         udpSender?.stop()
         bluetoothSender?.destroy()
+        arduinoSender?.sendCommand("%Q")
+        arduinoSender?.closeConnection()
     }
 
     private fun updateBatteryLevel() {
@@ -846,6 +1242,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onPause() {
         super.onPause()
         sensorManager?.unregisterListener(this)
+        arduinoSender?.sendCommand("%Q")
         
         // Zero out gyro inputs to prevent stuck steering when suspended
         val state = udpSender?.state ?: bluetoothSender?.state
@@ -890,9 +1287,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             Sensor.TYPE_ACCELEROMETER -> {
                 val state = udpSender?.state
                 if (state != null) {
-                    var ax = event.values[0].toDouble()
-                    var ay = event.values[1].toDouble()
-                    var az = event.values[2].toDouble()
+                    val ax = event.values[0].toDouble()
+                    val ay = event.values[1].toDouble()
+                    val az = event.values[2].toDouble()
 
                     if (calibrationFramesAccel > 0) {
                         sumAx += ax
@@ -974,17 +1371,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             var outY = 0f
             
             // X-axis (Pitch / Forward-Backward)
-            if (Math.abs(smoothedTiltX) > deadzone) {
-                val magnitude = (Math.abs(smoothedTiltX) - deadzone) / (6f - deadzone)
-                outX = Math.signum(smoothedTiltX) * magnitude.coerceIn(0f, 1f)
-                outX = outX * outX * Math.signum(outX)
+            if (kotlin.math.abs(smoothedTiltX) > deadzone) {
+                val magnitude = (kotlin.math.abs(smoothedTiltX) - deadzone) / (6f - deadzone)
+                outX = kotlin.math.sign(smoothedTiltX) * magnitude.coerceIn(0f, 1f)
+                outX *= outX * kotlin.math.sign(outX)
             }
             
             // Y-axis (Roll / Left-Right)
             if (kotlin.math.abs(smoothedTiltY) > deadzone) {
                 val magnitude = (kotlin.math.abs(smoothedTiltY) - deadzone) / (6f - deadzone)
                 outY = kotlin.math.sign(smoothedTiltY) * magnitude.coerceIn(0f, 1f)
-                outY = outY * outY * kotlin.math.sign(outY)
+                outY *= outY * kotlin.math.sign(outY)
             }
             
             val lx = (outY * 32767).toInt().toShort() // Left/Right steering mapped to Y tilt
@@ -1033,19 +1430,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
-    private fun applyMainTheme() {
-        val pColor = ThemeConfig.primaryColor
-        findViewById<TextView>(R.id.tvNyxx)?.setShadowLayer(12f, 0f, 4f, pColor)
-        findViewById<TextView>(R.id.tvSubtitle)?.setTextColor(pColor)
-        findViewById<Button>(R.id.connectButton)?.setTextColor(pColor)
-        findViewById<android.widget.ImageButton>(R.id.btnBackToHome)?.setColorFilter(pColor)
-    }
 
     private fun applyGamepadTheme() {
         val pColor = ThemeConfig.primaryColor
         val bgColor = ThemeConfig.backgroundColor
         // Accent tints
-        findViewById<android.widget.ImageButton>(R.id.btnOpenMenu)?.setColorFilter(pColor)
+        findViewById<ImageButton>(R.id.btnOpenMenu)?.setColorFilter(pColor)
         findViewById<TextView>(R.id.tvSheetTitle)?.setTextColor(pColor)
         findViewById<TextView>(R.id.tvMenuTitle)?.setTextColor(pColor)
         
@@ -1056,8 +1446,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         // Tint the DONE button in the new top bar
         val floatingBox = findViewById<LinearLayout>(R.id.editModeFloatingBox)
-        floatingBox?.findViewById<androidx.appcompat.widget.AppCompatButton>(R.id.btnDoneEdit)
-            ?.backgroundTintList = android.content.res.ColorStateList.valueOf(pColor)
+        floatingBox?.findViewById<AppCompatButton>(R.id.btnDoneEdit)
+            ?.backgroundTintList = ColorStateList.valueOf(pColor)
 
         // Background propagation
         drawerLayout?.setBackgroundColor(bgColor)

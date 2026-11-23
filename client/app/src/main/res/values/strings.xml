@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ip_port_format">%1$s:%2$s</string>
+    <string name="select_a_button">Select a button</string>
 </resources>

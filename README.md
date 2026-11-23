@@ -2,21 +2,23 @@
 
 ![AI Assisted](https://img.shields.io/badge/AI-Assisted-8A2BE2?style=for-the-badge&logo=openai)
 
-Nyxx is a high-performance, ultra-low latency application that instantly turns your Android phone into a fully functional Xbox 360 controller for your Windows PC.
+Nyxx is a high-performance, ultra-low latency application that turns your Android phone into a customizable Xbox 360 controller for your Windows PC, as well as a direct Serial Bluetooth controller for Arduino and DIY robotics.
 
 ## ✨ Features
 
-- **Tri-Mode Connectivity:** Connect via high-speed **Wi-Fi**, ultra-low latency **USB Tethering**, or wireless **Bluetooth**.
-- **Native XInput Support:** Games automatically recognize your phone as a standard Xbox 360 controller — no game-specific configuration or mapping required.
+- **Tri-Mode Connectivity:** 
+  - 🌐 **Wi-Fi / Hotspot (Local Network):** Connects wirelessly to the Nyxx PC Server for PC games and emulators with auto-discovery.
+  - 🔌 **Wired (USB Tethering):** Ultra-low latency wired connection to the Nyxx PC Server.
+  - 🤖 **Bluetooth (Arduino / RC Mode):** Direct Serial Port Profile (SPP) connection to Arduino/ESP32 robot cars using HC-05 / HC-06 modules.
+- **Native XInput Support:** Games automatically recognize your phone as a standard Xbox 360 controller via ViGEmBus — no game-specific configuration required.
 - **Multiplayer:** Up to 8 controllers can connect at once! (Players 1-4 get full PC/Xbox & Emulator compatibility. Players 5-8 get Emulator-only compatibility via DSU).
-- **QR Code Quick Connect:** Scan the QR code shown on the PC server to connect instantly, no manual IP entry needed.
-- **Motion Controls:** Optional gyro/tilt steering with 3 selectable modes and one-tap calibration.
+- **Motion Controls:** Optional gyro/tilt steering with selectable modes and one-tap sensor calibration.
 - **Customizable Layout:** Resize, reposition, and adjust the opacity of every on-screen button group; toggle turbo and analog-trigger behavior per button.
-- **Multiple Controller Profiles:** Switch between Nintendo, Xbox, and PSP-style button layouts.
-- **Rumble Feedback:** Controller vibration is forwarded from the game back to your phone.
+- **Multiple Controller Profiles:** Switch between Nintendo, Joy-Con (L/R), Wii Remote, Xbox, and PSP-style button layouts.
+- **Haptic Rumble Feedback:** Controller vibration forwarded from your PC game back to your phone.
+- **Direct-to-Arduino Serial Stream:** Sends discrete ASCII character commands (`'F'`, `'B'`, `'L'`, `'R'`, `'S'`) throttled to 20Hz for DIY robotics.
 - **Runs in the Background:** The PC server minimizes to the system tray and keeps running quietly.
 - **Zero Bloatware:** Built from the ground up for maximum performance and minimal battery drain.
-- **Update Notifications:** Both the PC server and Android app automatically check GitHub for new releases and let you know — with a one-click link to download — whenever a newer version is available.
 
 ## 🕹️ Supported Emulators & Games
 
@@ -31,7 +33,6 @@ Perfect for games that require shaking, steering, or pointing.
 - **Vita3K** (PS Vita)
 
 **Standard Controller Support (via Virtual Xbox Controller):**
-Perfectly detected as a standard Xbox controller for non-motion gaming.
 - **Steam, Epic Games, Xbox Game Pass** (All PC Games)
 - **PCSX2** (PlayStation 2)
 - **RPCS3** (PlayStation 3)
@@ -41,37 +42,30 @@ Perfectly detected as a standard Xbox controller for non-motion gaming.
 - **xemu** (Original Xbox)
 - **RetroArch** (All classic consoles)
 
+---
 
-## 📦 Installation
+## 📦 Installation & Setup
 
-Nyxx requires two components to work: the Windows Server and the Android App.
+Nyxx provides two software components: the Windows Server (for PC gaming) and the Android App.
 
-### Requirements
-
-- Windows 10/11 (64-bit)
-- Android phone on the same Wi-Fi network as your PC (for Wi-Fi mode), or a USB/Bluetooth connection
-
-### 1. Windows Server Setup
-
+### 1. Windows Server Setup (For PC Gaming / Emulators)
 1. Go to the [Releases](../../releases/latest) page and download `NyxxServer_Setup.exe`.
 2. Run the installer on your Windows PC. It will automatically install the necessary ViGEmBus driver and the Nyxx Server.
-   - If Windows SmartScreen shows a warning, click **More info → Run anyway** — the installer isn't code-signed yet.
 3. Open the **Nyxx Server** from your Start Menu.
 
 ### 2. Android App Setup
+1. Download and install `Nyxx.apk` on your Android phone from the [Releases](../../releases/latest) page.
+2. Open the Nyxx app and choose your connection method:
+   - **Wi-Fi / Hotspot:** Auto-discovers and connects to your Nyxx PC Server.
+   - **Wired (USB Tethering):** Connects via USB cable with Android USB Tethering enabled.
+   - **Bluetooth (Arduino / RC Mode):** Connects directly to HC-05 / HC-06 Bluetooth modules on Arduino/ESP32 robotics.
 
-1. Go to the [Releases](../../releases/latest) page on your Android phone and download `Nyxx.apk`.
-2. Open the file to install the app (you may need to allow "Install from unknown sources" in your Android settings).
-3. Open the Nyxx app, choose your connection method (Wi-Fi, USB, or Bluetooth).
-4. Scan the QR code shown on the PC server, or enter the IP/Port manually, to connect.
+---
 
 ## 🛠️ Building from Source
 
-If you prefer to build the applications yourself:
-
 **Windows Server:**
 Built using WPF and .NET 8.
-
 ```bash
 cd server
 dotnet build -c Release
@@ -79,7 +73,6 @@ dotnet build -c Release
 
 **Android Client:**
 Built using Kotlin and Android Studio.
-
 ```bash
 cd client
 ./gradlew assembleRelease
@@ -91,7 +84,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 🙌 Acknowledgements
 
-This project was proudly **AI-assisted**, using advanced agentic tools to rapidly prototype, build, and deploy the entire hardware-emulation stack from scratch.
-
 Nyxx utilizes the excellent **ViGEmBus** driver (Copyright © Nefarius Software Solutions e.U.) for Windows gamepad emulation. Please see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) for license details.
-hehe

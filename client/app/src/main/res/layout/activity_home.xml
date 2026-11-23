@@ -118,7 +118,7 @@
                 android:id="@+id/btnConnectBluetooth"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
-                android:text="Bluetooth"
+                android:text="Bluetooth (Arduino / RC Mode)"
                 android:drawableStart="@drawable/ic_bluetooth"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"

@@ -8,20 +8,21 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
 import kotlin.math.hypot
 import kotlin.math.min
 
 
 object GamepadColors {
-    val neutralBase = Color.parseColor("#1C1F24")
-    val neutralTop = Color.parseColor("#3D4249")
-    val neutralStroke = Color.parseColor("#5B6270")
-    val neutralText = Color.parseColor("#EDEEF0")
+    val neutralBase = "#1C1F24".toColorInt()
+    val neutralTop = "#3D4249".toColorInt()
+    val neutralStroke = "#5B6270".toColorInt()
+    val neutralText = "#EDEEF0".toColorInt()
 
-    val yBase = Color.parseColor("#1F7A4D"); val yTop = Color.parseColor("#3DDC84"); val yText = Color.parseColor("#0B3320")
-    val xBase = Color.parseColor("#1B6FA0"); val xTop = Color.parseColor("#4FC3F7"); val xText = Color.parseColor("#0A2E42")
-    val aBase = Color.parseColor("#A33131"); val aTop = Color.parseColor("#FF5C5C"); val aText = Color.parseColor("#4A1414")
-    val bBase = Color.parseColor("#A67B14"); val bTop = Color.parseColor("#FFD54F"); val bText = Color.parseColor("#4A3607")
+    val yBase = "#1F7A4D".toColorInt(); val yTop = "#3DDC84".toColorInt(); val yText = "#0B3320".toColorInt()
+    val xBase = "#1B6FA0".toColorInt(); val xTop = "#4FC3F7".toColorInt(); val xText = "#0A2E42".toColorInt()
+    val aBase = "#A33131".toColorInt(); val aTop = "#FF5C5C".toColorInt(); val aText = "#4A1414".toColorInt()
+    val bBase = "#A67B14".toColorInt(); val bTop = "#FFD54F".toColorInt(); val bText = "#4A3607".toColorInt()
 }
 
 data class ButtonSpec(
@@ -179,12 +180,14 @@ data class ButtonConfig(
     var colorOverride: Int? = null
 )
 
+@Suppress("SpellCheckingInspection")
 class GamepadView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
     var udpSender: UdpSender? = null
     var bluetoothSender: BluetoothHidSender? = null
+    var arduinoSender: ArduinoBluetoothManager? = null
     var onMenuRequested: (() -> Unit)? = null
     var onButtonEditRequested: ((String) -> Unit)? = null
     var onEditModeExited: (() -> Unit)? = null
@@ -230,7 +233,7 @@ class GamepadView @JvmOverloads constructor(
     }
     
     private val gridPaint = Paint().apply {
-        color = Color.parseColor("#1F2833")
+        color = "#1F2833".toColorInt()
         strokeWidth = 2f
         style = Paint.Style.STROKE
     }
@@ -946,6 +949,30 @@ class GamepadView @JvmOverloads constructor(
     }
 
     private fun updateJoystick(joy: Joystick, x: Float, y: Float, isLeft: Boolean) {
+        if (arduinoSender != null && !isInputPaused) {
+            val now = System.currentTimeMillis()
+            if (now - lastAnalogSendTime > 50) { // Throttle to 20Hz
+                lastAnalogSendTime = now
+                
+                // If tilting forward, map to 'F', backward to 'B', etc.
+                val tiltX = (x - joy.cx) / joy.radius
+                val tiltY = -(y - joy.cy) / joy.radius
+                
+                var cmd = lastArduinoCmd
+                if (tiltY > 0.4f) cmd = "F"
+                else if (tiltY < -0.4f) cmd = "B"
+                else if (tiltX > 0.4f) cmd = "R"
+                else if (tiltX < -0.4f) cmd = "L"
+                else cmd = "S"
+                
+                if (cmd != lastArduinoCmd) {
+                    lastArduinoCmd = cmd
+                    arduinoSender?.sendCommand(cmd)
+                }
+            }
+            return
+        }
+
         if (isEditMode) return
         val state = udpSender?.state ?: bluetoothSender?.state ?: return
         
@@ -985,11 +1012,34 @@ class GamepadView @JvmOverloads constructor(
                 }
             }
         }
+        
+        handleArduinoJoystickCommand(state.ly, state.lx)
         invalidate()
     }
 
+    private var lastArduinoCmd = ""
+    private var lastAnalogSendTime = 0L
+
+    private fun handleArduinoJoystickCommand(ly: Short, lx: Short) {
+        if (arduinoSender == null || isInputPaused) return
+        
+        // Simple car logic: Up = F, Down = B, Left = L, Right = R, Center = S
+        var cmd = "S"
+        if (ly > 16000) cmd = "F"
+        else if (ly < -16000) cmd = "B"
+        else if (lx < -16000) cmd = "L"
+        else if (lx > 16000) cmd = "R"
+        
+        if (cmd != lastArduinoCmd) {
+            lastArduinoCmd = cmd
+            arduinoSender?.sendCommand(cmd)
+        }
+    }
+
     private fun updateButtonState() {
-        val state = udpSender?.state ?: bluetoothSender?.state ?: return
+        val state = udpSender?.state ?: bluetoothSender?.state
+        if (state == null && arduinoSender == null) return
+        
         var mask = 0; var lt: Byte = 0; var rt: Byte = 0
         if (!isInputPaused) {
             for (btn in buttons) {
@@ -1004,13 +1054,39 @@ class GamepadView @JvmOverloads constructor(
                 }
             }
             if (currentProfile.id.startsWith("joycon")) {
-                if (state.ly > 16000) mask = mask or 0x0001 // Up
-                if (state.ly < -16000) mask = mask or 0x0002 // Down
-                if (state.lx < -16000) mask = mask or 0x0004 // Left
-                if (state.lx > 16000) mask = mask or 0x0008 // Right
+                if (state?.ly ?: 0 > 16000) mask = mask or 0x0001 // Up
+                if (state?.ly ?: 0 < -16000) mask = mask or 0x0002 // Down
+                if (state?.lx ?: 0 < -16000) mask = mask or 0x0004 // Left
+                if (state?.lx ?: 0 > 16000) mask = mask or 0x0008 // Right
             }
         }
-        state.buttons = mask; state.lt = lt; state.rt = rt
+        
+        if (state != null) {
+            state.buttons = mask; state.lt = lt; state.rt = rt
+        }
+        
+        handleArduinoButtonCommand(mask)
+    }
+
+    private fun handleArduinoButtonCommand(mask: Int) {
+        if (arduinoSender == null || isInputPaused) return
+        
+        // Digital mapping for Arduino. 
+        // 0x0001 = Dpad Up -> F
+        // 0x0002 = Dpad Down -> B
+        // 0x0004 = Dpad Left -> L
+        // 0x0008 = Dpad Right -> R
+        
+        var cmd = "S"
+        if ((mask and 0x0001) != 0 || (mask and 0x1000) != 0) cmd = "F" // Dpad Up or Y (0x1000)
+        else if ((mask and 0x0002) != 0 || (mask and 0x4000) != 0) cmd = "B" // Dpad Down or A (0x4000)
+        else if ((mask and 0x0004) != 0 || (mask and 0x8000) != 0) cmd = "L" // Dpad Left or X (0x8000)
+        else if ((mask and 0x0008) != 0 || (mask and 0x2000) != 0) cmd = "R" // Dpad Right or B (0x2000)
+        
+        if (cmd != lastArduinoCmd) {
+            lastArduinoCmd = cmd
+            arduinoSender?.sendCommand(cmd)
+        }
     }
 
     private fun drawPauseToggle(canvas: Canvas) {
@@ -1018,7 +1094,7 @@ class GamepadView @JvmOverloads constructor(
         val cx = if (isTopRightPause) width * 0.85f else width / 2f
         val cy = if (isTopRightPause) height * 0.06f else height * 0.1f
         val r = Math.min(width, height) * 0.05f
-        paint.color = if (isInputPaused) Color.parseColor("#FF5C5C") else GamepadColors.neutralBase
+        paint.color = if (isInputPaused) "#FF5C5C".toColorInt() else GamepadColors.neutralBase
         paint.style = Paint.Style.FILL; paint.alpha = 200; canvas.drawCircle(cx, cy, r, paint)
         paint.color = GamepadColors.neutralText; paint.alpha = 255; paint.style = Paint.Style.STROKE; paint.strokeWidth = r * 0.2f
         if (isInputPaused) {
@@ -1089,7 +1165,7 @@ class GamepadView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(Color.parseColor("#0B0C10"))
+        canvas.drawColor("#0B0C10".toColorInt())
         if (isEditMode) {
             val w = width.toFloat(); val h = height.toFloat(); val gridSize = h / 10f
             var i = 0f; while (i < w) { canvas.drawLine(i, 0f, i, h, gridPaint); i += gridSize }
@@ -1388,7 +1464,7 @@ class GamepadView @JvmOverloads constructor(
         canvas.drawCircle(joy.knobX, joy.knobY, joy.radius * 0.45f, paint)
         
         // Knob inner highlight/gradient ring for 3D effect
-        paint.color = Color.parseColor("#0B0C10")
+        paint.color = "#0B0C10".toColorInt()
         paint.alpha = (alphaInt * 0.6f).toInt()
         paint.style = Paint.Style.FILL
         canvas.drawCircle(joy.knobX, joy.knobY, joy.radius * 0.25f, paint)

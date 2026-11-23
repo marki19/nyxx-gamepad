@@ -2,12 +2,11 @@ package com.nativegamepad
 
 import android.app.AlertDialog
 import android.content.Context
-import android.graphics.Color
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.widget.EditText
-import android.widget.TextView
-import android.text.TextWatcher
-import android.text.Editable
+import androidx.core.graphics.toColorInt
 
 class ThemeSettingsDialog(private val context: Context, private val onThemeChanged: () -> Unit) {
 
@@ -49,10 +48,10 @@ class ThemeSettingsDialog(private val context: Context, private val onThemeChang
                 val hex = s?.toString() ?: ""
                 if (hex.matches(Regex("^#[0-9a-fA-F]{6}$"))) {
                     try {
-                        val parsed = Color.parseColor(hex)
+                        val parsed = hex.toColorInt()
                         tempPrimary = parsed
                         colorPicker.setColor(parsed)
-                    } catch (e: Exception) {}
+                    } catch (_: Exception) {}
                 }
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
