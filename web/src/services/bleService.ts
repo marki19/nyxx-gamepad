@@ -35,7 +35,7 @@ class BleService {
     }
   }
 
-  public async connect(showAllDevices: boolean = false): Promise<boolean> {
+  public async connect(showAllDevices: boolean = true): Promise<boolean> {
     if (this.status === 'connected') {
       this.disconnect();
       return false;
@@ -48,11 +48,13 @@ class BleService {
     try {
       this.setStatus('scanning');
 
+      // Use acceptAllDevices by default so renamed devices (not named JDY-16) are visible,
+      // or filter by the standard BLE UART Service UUID (FFE0).
       const options: RequestDeviceOptions = showAllDevices
         ? { acceptAllDevices: true, optionalServices: [SERVICE_UUID] }
         : {
             filters: [
-              { name: 'JDY-16' },
+              { services: [SERVICE_UUID] },
               { namePrefix: 'JDY' },
               { namePrefix: 'BT' }
             ],
@@ -61,7 +63,7 @@ class BleService {
 
       const device = await navigator.bluetooth.requestDevice(options);
       this.device = device;
-      this.deviceName = device.name || 'JDY-16';
+      this.deviceName = device.name || 'Robot Car';
 
       device.addEventListener('gattserverdisconnected', () => {
         this.txCharacteristic = null;

@@ -14,7 +14,7 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
 }) => {
   const [isSupported, setIsSupported] = useState<boolean>(true);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
-  const [showAllDevices, setShowAllDevices] = useState<boolean>(false);
+  const [showAllDevices, setShowAllDevices] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
 
@@ -46,7 +46,9 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleConnect = async () => {
+  const handleConnect = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!isSupported || !isAvailable || isConnecting) return;
     setErrorMessage(null);
     setIsConnecting(true);
     try {
@@ -62,8 +64,8 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
   };
 
   return (
-    <div className="bt-modal-backdrop">
-      <div className="bt-modal-card">
+    <div className="bt-modal-backdrop" onClick={handleConnect}>
+      <div className="bt-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className={`bt-icon-wrapper ${!isAvailable || !isSupported ? 'disabled' : 'pulsing'}`}>
           <svg className="bt-icon" viewBox="0 0 24 24">
             <path d="M12 2a1 1 0 0 1 1 1v7.59l4.3-4.3a1 1 0 0 1 1.4 1.42L14.42 12l4.28 4.29a1 1 0 0 1-1.4 1.42L13 13.41V21a1 1 0 0 1-2 0v-7.59l-4.3 4.3a1 1 0 0 1-1.4-1.42L9.58 12 5.3 7.71a1 1 0 0 1 1.4-1.42L11 10.59V3a1 1 0 0 1 1-1zm-1 9.41V4.41L7.71 7.7 11 11.41zm2 0 3.29-3.71L13 4.41v7zm0 1.18v7l3.29-3.29L13 12.59zm-2 0-3.29 3.71L11 19.59v-7z" />
@@ -73,7 +75,7 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
         <h2 className="modal-title">Connect Robot Car</h2>
 
         <p className="modal-subtitle">
-          Turn <strong>ON Bluetooth</strong> on your phone/PC, then tap Find Device to pair with your JDY-16 car.
+          Tap <strong>anywhere on the screen</strong> to scan for your car.
         </p>
 
         {!isSupported && (
@@ -85,13 +87,13 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
         {isSupported && !isAvailable && (
           <div className="bt-notice error">
             ⚠️ <strong>Bluetooth is turned OFF</strong>.<br />
-            Turn ON Bluetooth in your device settings or quick settings panel, then tap Find Device.
+            Turn ON Bluetooth in your device settings or quick settings panel, then tap anywhere to scan.
           </div>
         )}
 
         {isSupported && isAvailable && !errorMessage && (
           <div className="bt-notice info">
-            ✓ <strong>Bluetooth is ON</strong>. Tap Find Device to search for your JDY-16 Car.
+            ✓ <strong>Bluetooth is ON</strong>. Tap anywhere on screen to scan devices.
           </div>
         )}
 
@@ -112,16 +114,16 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
             </svg>
             <span>
               {isConnecting
-                ? 'Connecting...'
+                ? 'Scanning Devices...'
                 : !isAvailable
-                ? 'Check Bluetooth & Find Device'
-                : 'Find Device'}
+                ? 'Check Bluetooth & Scan'
+                : 'Tap to Scan Devices'}
             </span>
           </button>
         )}
 
         <div className="modal-options">
-          <label className="chk-container">
+          <label className="chk-container" onClick={(e) => e.stopPropagation()}>
             <input
               type="checkbox"
               checked={showAllDevices}
@@ -129,7 +131,13 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
             />
             Show all devices
           </label>
-          <button className="btn-modal-dismiss" onClick={onClose}>
+          <button
+            className="btn-modal-dismiss"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+          >
             Manual Mode
           </button>
         </div>

@@ -88,6 +88,9 @@ class ArduinoBluetoothManager(
     private val _connectionState = MutableStateFlow(BleConnectionState.Disconnected)
     val connectionState: StateFlow<BleConnectionState> = _connectionState.asStateFlow()
 
+    var connectedDeviceName: String = "Robot Car"
+        private set
+
     // Backward-compatible isConnected property
     val isConnected: Boolean
         get() = _connectionState.value == BleConnectionState.Connected
@@ -197,12 +200,14 @@ class ArduinoBluetoothManager(
         }
 
         val filters = mutableListOf<ScanFilter>()
-        val filterByName = ScanFilter.Builder().setDeviceName(targetDeviceName).build()
-        filters.add(filterByName)
-
         if (!expectedAddress.isNullOrBlank() && BluetoothAdapter.checkBluetoothAddress(expectedAddress)) {
             val filterByAddress = ScanFilter.Builder().setDeviceAddress(expectedAddress).build()
             filters.add(filterByAddress)
+        } else {
+            // Match devices advertising the BLE Serial Service (FFE0) so renamed devices are found
+            try {
+                filters.add(ScanFilter.Builder().setServiceUuid(android.os.ParcelUuid(SERVICE_UUID)).build())
+            } catch (_: Exception) {}
         }
 
         val settings = ScanSettings.Builder()
@@ -215,11 +220,14 @@ class ArduinoBluetoothManager(
                 val name = result.scanRecord?.deviceName ?: device.name ?: ""
                 Log.d(TAG, "Discovered BLE device: $name [${device.address}]")
 
+                val serviceUuids = result.scanRecord?.serviceUuids
+                val matchesService = serviceUuids?.any { it.uuid == SERVICE_UUID } == true
                 val matchesName = name.equals(targetDeviceName, ignoreCase = true) || name.contains("JDY", ignoreCase = true)
                 val matchesAddress = expectedAddress != null && device.address.equals(expectedAddress, ignoreCase = true)
 
-                if (matchesName || matchesAddress) {
-                    Log.i(TAG, "Target JDY-16 matched! Stopping scan and connecting...")
+                if (matchesService || matchesName || matchesAddress) {
+                    connectedDeviceName = if (name.isNotBlank()) name else (device.name ?: "Robot Car")
+                    Log.i(TAG, "Target car matched ($connectedDeviceName)! Stopping scan and connecting...")
                     stopScan()
                     connectGattInternal(device)
                 }

@@ -720,7 +720,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         updateModeSelectionUI(null)
                     }
                     BleConnectionState.Scanning -> {
-                        tvStatus.text = "Scanning (JDY-16)..."
+                        tvStatus.text = "Scanning..."
                         tvStatus.setTextColor(Color.parseColor("#FFA500"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
                         setControlsEnabled(false)
@@ -738,7 +738,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         setControlsEnabled(false)
                     }
                     BleConnectionState.Connected -> {
-                        tvStatus.text = "Connected (JDY-16)"
+                        val carName = sender.connectedDeviceName
+                        tvStatus.text = "Connected ($carName)"
                         tvStatus.setTextColor(Color.parseColor("#66FCF1"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#66FCF1"))
 
