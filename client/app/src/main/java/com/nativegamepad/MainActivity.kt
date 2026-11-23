@@ -1245,6 +1245,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            btStateReceiver?.let { unregisterReceiver(it) }
+        } catch (_: Exception) {}
         discoveryJob?.cancel()
         sensorManager?.unregisterListener(this)
         udpSender?.stop()
@@ -1489,13 +1492,5 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         // Background propagation
         drawerLayout?.setBackgroundColor(bgColor)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        try {
-            btStateReceiver?.let { unregisterReceiver(it) }
-        } catch (_: Exception) {}
-        arduinoSender?.closeConnection()
     }
 }
