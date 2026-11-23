@@ -16,6 +16,7 @@ class BleService {
 
   // Throttled priority queue: latest joystick overwrites old; stop always has priority
   private latestJoystick: string | null = null;
+  private latestDriveCmd: string | null = null;
   private stopPending: boolean = false;
   private writeBusy: boolean = false;
 
@@ -105,8 +106,14 @@ class BleService {
     this.pump();
   }
 
+  public queueDriveCommand(cmd: string) {
+    this.latestDriveCmd = cmd;
+    this.pump();
+  }
+
   public queueStop() {
     this.latestJoystick = null;
+    this.latestDriveCmd = null;
     this.stopPending = true;
     this.pump();
   }
@@ -131,7 +138,12 @@ class BleService {
     let payload: string | null = null;
     if (this.stopPending) {
       this.stopPending = false;
+      this.latestDriveCmd = null;
+      this.latestJoystick = null;
       payload = '%S';
+    } else if (this.latestDriveCmd !== null) {
+      payload = this.latestDriveCmd;
+      this.latestDriveCmd = null;
     } else if (this.latestJoystick !== null) {
       payload = this.latestJoystick;
       this.latestJoystick = null;

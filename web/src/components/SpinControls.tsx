@@ -6,35 +6,40 @@ interface SpinControlsProps {
 }
 
 export const SpinControls: React.FC<SpinControlsProps> = ({ onStopAll }) => {
-  const activeSpinTimer = useRef<any>(null);
+  const spinIntervalRef = useRef<any>(null);
 
   const startSpin = (cmd: string) => {
     stopSpin();
-    ble.sendRawCommand(cmd);
-    // Keep alive packet every 100ms
-    activeSpinTimer.current = setInterval(() => {
-      ble.sendRawCommand(cmd);
-    }, 100);
+    ble.queueDriveCommand(cmd);
+    // Continuous spin while holding: resend packet every 80ms
+    spinIntervalRef.current = setInterval(() => {
+      ble.queueDriveCommand(cmd);
+    }, 80);
   };
 
   const stopSpin = () => {
-    if (activeSpinTimer.current) {
-      clearInterval(activeSpinTimer.current);
-      activeSpinTimer.current = null;
+    if (spinIntervalRef.current) {
+      clearInterval(spinIntervalRef.current);
+      spinIntervalRef.current = null;
     }
-    ble.sendRawCommand('%S');
+    ble.queueStop();
   };
 
   return (
     <div className="spin-row">
       <button
         className="btn-secondary"
-        onTouchStart={(e) => { e.preventDefault(); startSpin('%L'); }}
-        onTouchEnd={(e) => { e.preventDefault(); stopSpin(); }}
-        onTouchCancel={(e) => { e.preventDefault(); stopSpin(); }}
-        onMouseDown={() => startSpin('%L')}
-        onMouseUp={stopSpin}
-        onMouseLeave={stopSpin}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {}
+          startSpin('%L');
+        }}
+        onPointerUp={(e) => {
+          e.preventDefault();
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {}
+          stopSpin();
+        }}
+        onPointerCancel={stopSpin}
       >
         Spin Left
       </button>
@@ -48,12 +53,17 @@ export const SpinControls: React.FC<SpinControlsProps> = ({ onStopAll }) => {
 
       <button
         className="btn-secondary"
-        onTouchStart={(e) => { e.preventDefault(); startSpin('%R'); }}
-        onTouchEnd={(e) => { e.preventDefault(); stopSpin(); }}
-        onTouchCancel={(e) => { e.preventDefault(); stopSpin(); }}
-        onMouseDown={() => startSpin('%R')}
-        onMouseUp={stopSpin}
-        onMouseLeave={stopSpin}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {}
+          startSpin('%R');
+        }}
+        onPointerUp={(e) => {
+          e.preventDefault();
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {}
+          stopSpin();
+        }}
+        onPointerCancel={stopSpin}
       >
         Spin Right
       </button>

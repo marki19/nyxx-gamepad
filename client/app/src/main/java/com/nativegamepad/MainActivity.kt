@@ -521,8 +521,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        // Hold-to-Drive: Drives while finger is pressed, stops (%S) immediately on release
+        // Hold-to-Drive: Drives continuously while finger is pressed, stops (%S) immediately on release
         fun setupHoldToDriveButton(button: Button?, driveCmd: String) {
+            var holdJob: Job? = null
             button?.apply {
                 isHapticFeedbackEnabled = true
                 setOnTouchListener { v, event ->
@@ -531,12 +532,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                             v.animate().scaleX(0.88f).scaleY(0.88f).setDuration(50).start()
                             v.isPressed = true
                             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                            arduinoSender?.sendCommand(driveCmd)
+                            holdJob?.cancel()
+                            holdJob = lifecycleScope.launch {
+                                while (isActive) {
+                                    arduinoSender?.sendCommand(driveCmd)
+                                    delay(80L)
+                                }
+                            }
                             true
                         }
                         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                             v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(80).start()
                             v.isPressed = false
+                            holdJob?.cancel()
+                            holdJob = null
                             arduinoSender?.stop()
                             true
                         }
