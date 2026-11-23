@@ -34,6 +34,12 @@ __pycache__/
 # uv scaffold (placeholder entry point, not project code)
 main.py
 
+# Node / Web
+node_modules/
+dist/
+web/dist/
+.npm/
+
 # Graphify
 graphify-out/
 # AI / Tooling / Uploads
