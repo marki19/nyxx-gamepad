@@ -14,6 +14,7 @@ export const App: React.FC = () => {
 
   const [activeMode, setActiveMode] = useState<string | null>(null);
   const [distance, setDistance] = useState<number>(35);
+  const [followDistance, setFollowDistance] = useState<number>(60);
   const [speed, setSpeed] = useState<number>(70);
 
   useEffect(() => {
@@ -23,18 +24,21 @@ export const App: React.FC = () => {
 
       if (newStatus === 'connected') {
         setIsModalOpen(false);
-        // Requirement: Send initial saved distance and speed on connect
+        // Requirement: Send initial saved distance, follow range, and speed on connect
         ble.sendRawCommand(`%D${distance}#`);
         setTimeout(() => {
-          ble.sendRawCommand(`%V${speed}#`);
+          ble.sendRawCommand(`%C${followDistance}#`);
         }, 50);
+        setTimeout(() => {
+          ble.sendRawCommand(`%V${speed}#`);
+        }, 100);
       } else if (newStatus === 'disconnected') {
         setActiveMode(null);
       }
     });
 
     return () => unsubscribe();
-  }, [distance, speed]);
+  }, [distance, followDistance, speed]);
 
   const handleToggleMode = useCallback(async (cmd: string) => {
     if (status !== 'connected') {
@@ -112,9 +116,11 @@ export const App: React.FC = () => {
         {/* Center Column: Stop Button & Sliders */}
         <TuningSliders
           distance={distance}
+          followDistance={followDistance}
           speed={speed}
           activeMode={activeMode}
           onDistanceChange={setDistance}
+          onFollowDistanceChange={setFollowDistance}
           onSpeedChange={setSpeed}
           onStopAll={handleStopAll}
         />
