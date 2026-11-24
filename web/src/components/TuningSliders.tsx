@@ -70,6 +70,22 @@ export const TuningSliders: React.FC<TuningSlidersProps> = ({
         STOP
       </button>
 
+      {/* Cruise Speed (Top-most) */}
+      <div className="slider-box">
+        <div className="slider-label-row">
+          <span>Cruise Speed</span>
+          <span className="slider-value">{speed} %</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={speed}
+          onChange={handleSpeed}
+        />
+      </div>
+
       {/* Obstacle Avoidance Distance */}
       <div className={`slider-box ${activeMode === '%A#' ? 'highlight' : ''}`}>
         <div className="slider-label-row">
@@ -131,22 +147,6 @@ export const TuningSliders: React.FC<TuningSlidersProps> = ({
           step="5"
           value={followRange}
           onChange={handleFollowRange}
-        />
-      </div>
-
-      {/* Cruise Speed */}
-      <div className="slider-box">
-        <div className="slider-label-row">
-          <span>Cruise Speed</span>
-          <span className="slider-value">{speed} %</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={speed}
-          onChange={handleSpeed}
         />
       </div>
     </section>
