@@ -604,6 +604,14 @@ class ArduinoBluetoothManager(
         pump()
     }
 
+    fun sendMotion(cmd: String) {
+        synchronized(lock) {
+            val payload = if (cmd.endsWith("\n")) cmd else "$cmd\n"
+            latest = payload.toByteArray(Charsets.UTF_8)
+        }
+        pump()
+    }
+
     fun stop() {
         synchronized(lock) {
             latest = null

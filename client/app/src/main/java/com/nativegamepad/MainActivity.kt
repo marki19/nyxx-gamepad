@@ -111,6 +111,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var udpSender: UdpSender? = null
     private var bluetoothSender: BluetoothHidSender? = null
     private var arduinoSender: ArduinoBluetoothManager? = null
+    private var smartCarMotionController: SmartCarMotionController? = null
     private var gamepadView: GamepadView? = null
     private var drawerLayout: DrawerLayout? = null
 
@@ -512,12 +513,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sliderSpeed.value = savedSpeed.toFloat()
         tvSpeedValue.text = "$savedSpeed %"
 
+        val btnTiltSteer = findViewById<Button>(R.id.btnTiltSteer)
+        val btnAirMove = findViewById<Button>(R.id.btnAirMove)
+
         fun setControlsEnabled(enabled: Boolean) {
             modeButtons.forEach { it.isEnabled = enabled; it.alpha = if (enabled) 1.0f else 0.5f }
             btnStop.isEnabled = enabled
             btnStop.alpha = if (enabled) 1.0f else 0.5f
             sliderDistance.isEnabled = enabled
             sliderSpeed.isEnabled = enabled
+            btnTiltSteer?.isEnabled = enabled
+            btnTiltSteer?.alpha = if (enabled) 1.0f else 0.5f
+            btnAirMove?.isEnabled = enabled
+            btnAirMove?.alpha = if (enabled) 1.0f else 0.5f
         }
         setControlsEnabled(false)
 
@@ -709,6 +717,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         fun stopAllModesAndMotion() {
+            smartCarMotionController?.stopHold()
+            virtualJoystick?.resetKnobPosition()
             robotModeJob?.cancel()
             activeRobotModeCmd = null
             arduinoSender?.stop()
@@ -741,6 +751,51 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         findViewById<Button>(R.id.btnSpinStop)?.applyInteractivePress {
             stopAllModesAndMotion()
         }
+
+        // Motion Controls (Tilt Steer & Air Move)
+        smartCarMotionController = SmartCarMotionController(
+            context = this,
+            sendBluetooth = { cmd ->
+                if (cmd == "%S") {
+                    arduinoSender?.stop()
+                } else {
+                    arduinoSender?.sendMotion(cmd)
+                }
+            },
+            onDotUpdated = { normX, normY, cmd ->
+                runOnUiThread {
+                    virtualJoystick?.setExternalKnobPosition(normX, normY)
+                    tvJoystickAngle?.text = if (cmd == "%S") "Motion: Center" else "Motion: $cmd"
+                }
+            }
+        )
+
+        fun setupMotionButton(button: Button?, mode: SmartCarMotionController.Mode) {
+            button?.setOnTouchListener { v, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        v.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#45A29E"))
+                        if (activeRobotModeCmd != null) {
+                            toggleMode(activeRobotModeCmd!!)
+                        }
+                        smartCarMotionController?.startHold(mode)
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        v.backgroundTintList = null
+                        smartCarMotionController?.stopHold()
+                        virtualJoystick?.resetKnobPosition()
+                        tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Touch to steer"
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+
+        setupMotionButton(btnTiltSteer, SmartCarMotionController.Mode.TILT_STEER)
+        setupMotionButton(btnAirMove, SmartCarMotionController.Mode.AIR_MOVE)
 
         // Observe ConnectionState
         val sender = arduinoSender ?: return
@@ -1249,6 +1304,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             btStateReceiver?.let { unregisterReceiver(it) }
         } catch (_: Exception) {}
         discoveryJob?.cancel()
+        smartCarMotionController?.stopHold()
         sensorManager?.unregisterListener(this)
         udpSender?.stop()
         bluetoothSender?.destroy()
@@ -1282,6 +1338,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onPause() {
         super.onPause()
+        smartCarMotionController?.stopHold()
         sensorManager?.unregisterListener(this)
         arduinoSender?.sendCommand("%Q")
         

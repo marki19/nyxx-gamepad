@@ -212,6 +212,18 @@ class VirtualJoystickView @JvmOverloads constructor(
         animator.start()
     }
 
+    fun setExternalKnobPosition(normX: Float, normY: Float) {
+        if (baseRadius <= 0f) return
+        val maxRadius = baseRadius - knobRadius * 0.2f
+        knobX = (centerX + normX * maxRadius).coerceIn(centerX - maxRadius, centerX + maxRadius)
+        knobY = (centerY - normY * maxRadius).coerceIn(centerY - maxRadius, centerY + maxRadius)
+        invalidate()
+    }
+
+    fun resetKnobPosition() {
+        animateKnobToCenter()
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         removeCallbacks(keepAliveRunnable)
