@@ -787,6 +787,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         smartCarMotionController?.stopHold()
                         virtualJoystick?.resetKnobPosition()
                         tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Touch to steer"
+                        val currentSpeed = sliderSpeed.value.toInt()
+                        arduinoSender?.sendCommand("%V$currentSpeed#")
                         true
                     }
                     else -> false
