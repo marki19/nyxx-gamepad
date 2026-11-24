@@ -220,11 +220,13 @@ class SmartCarMotionController(
         // Exponential curve: progressive feel, eliminates sudden 60-70 ramp
         val expCurve = normalized * normalized
 
-        val userMax = maxSpeedProvider?.invoke()?.coerceIn(25, 100) ?: 100
-        val minSpeed = 30 // minimum PWM to clear motor stall (MIN_PWM = 60)
-        val pct = (minSpeed + expCurve * (userMax - minSpeed)).roundToInt().coerceIn(minSpeed, userMax)
+        val userMax = maxSpeedProvider?.invoke()?.coerceIn(20, 100) ?: 100
+        val minSpeed = minOf(30, userMax)
+        val range = (userMax - minSpeed).coerceAtLeast(0)
+        val pct = if (range == 0) userMax else (minSpeed + expCurve * range).roundToInt().coerceIn(minSpeed, userMax)
 
-        val cmd = "@$deg,$pct#"
+        // Arduino G_Drive accepts @<deg># with length <= 7
+        val cmd = "@$deg#"
         lastCmd = cmd
         sendBluetooth(cmd)
         onDotUpdated?.invoke(normX, normY, cmd)

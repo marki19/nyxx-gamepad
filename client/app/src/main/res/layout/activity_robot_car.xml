@@ -580,31 +580,19 @@
                 android:gravity="center_vertical">
 
                 <!-- Brake / Reverse Pedal -->
-                <Button
+                <com.nativegamepad.RacingPedalView
                     android:id="@+id/btnPedalBrake"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:text="BRAKE\nREV"
-                    android:textSize="14sp"
-                    android:fontFamily="sans-serif-black"
-                    android:letterSpacing="0.06"
-                    android:textColor="#FF5C5C"
-                    android:background="@drawable/btn_pedal_brake"
                     android:layout_marginEnd="6dp" />
 
                 <!-- Gas / Forward Acceleration Pedal -->
-                <Button
+                <com.nativegamepad.RacingPedalView
                     android:id="@+id/btnPedalGas"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="1.2"
-                    android:text="GAS\nDRIVE"
-                    android:textSize="15sp"
-                    android:fontFamily="sans-serif-black"
-                    android:letterSpacing="0.06"
-                    android:textColor="#66FCF1"
-                    android:background="@drawable/btn_pedal_gas" />
+                    android:layout_weight="1.2" />
             </LinearLayout>
         </LinearLayout>
 

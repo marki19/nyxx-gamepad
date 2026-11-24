@@ -525,8 +525,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val layoutJoystickContainer = findViewById<LinearLayout>(R.id.layoutJoystickContainer)
         val tvJoystickAngle = findViewById<TextView>(R.id.tvJoystickAngle)
         val steeringWheel = findViewById<SteeringWheelView>(R.id.steeringWheel)
-        val btnPedalGas = findViewById<Button>(R.id.btnPedalGas)
-        val btnPedalBrake = findViewById<Button>(R.id.btnPedalBrake)
+        val btnPedalGas = findViewById<RacingPedalView>(R.id.btnPedalGas)?.apply {
+            pedalType = RacingPedalView.PedalType.GAS
+        }
+        val btnPedalBrake = findViewById<RacingPedalView>(R.id.btnPedalBrake)?.apply {
+            pedalType = RacingPedalView.PedalType.BRAKE
+        }
 
         val modeButtons = listOf(btnAvoid, btnFollow, btnLine, btnLight)
 
@@ -779,6 +783,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     lastSpeedSendTime = now
                     lastSpeedSent = spd
                     arduinoSender?.sendCommand("%V$spd#")
+                    arduinoSender?.sendCommand("%$spd+#")
                 }
             }
         }
@@ -791,6 +796,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 if (arduinoSender?.isConnected == true && spd != lastSpeedSent) {
                     lastSpeedSent = spd
                     arduinoSender?.sendCommand("%V$spd#")
+                    arduinoSender?.sendCommand("%$spd+#")
                 }
             }
         })
@@ -854,12 +860,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 activeRobotModeCmd = null
                 arduinoSender?.sendCommand("%Q")
                 updateModeSelectionUI(null)
+                lifecycleScope.launch {
+                    delay(60L)
+                    arduinoSender?.sendCommand("%G#")
+                }
                 return
             }
             robotModeJob = lifecycleScope.launch {
                 if (activeRobotModeCmd != null) {
                     arduinoSender?.sendCommand("%Q")
-                    delay(300L)
+                    delay(200L)
+                } else {
+                    arduinoSender?.sendCommand("%Q")
+                    delay(60L)
                 }
                 arduinoSender?.sendCommand(targetCmd)
                 activeRobotModeCmd = targetCmd
@@ -928,10 +941,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             isGasPressed = false
             isBrakePressed = false
             robotModeJob?.cancel()
+            val wasInAuto = activeRobotModeCmd != null
             activeRobotModeCmd = null
             arduinoSender?.stop()
             arduinoSender?.sendCommand("%Q")
             updateModeSelectionUI(null)
+            if (wasInAuto) {
+                lifecycleScope.launch {
+                    delay(60L)
+                    arduinoSender?.sendCommand("%G#")
+                }
+            }
         }
 
         btnAvoid.applyInteractivePress { toggleMode("%A#") }
@@ -967,51 +987,35 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        btnPedalGas?.setOnTouchListener { v, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                    isGasPressed = true
-                    isBrakePressed = false
-                    pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+        btnPedalGas?.onPedalStateChanged = { isDown ->
+            isGasPressed = isDown
+            if (isDown) {
+                isBrakePressed = false
+                pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+                sendPedalDrivePacket()
+                pedalStreamHandler.postDelayed(pedalStreamRunnable, 75L)
+            } else {
+                if (isBrakePressed) {
                     sendPedalDrivePacket()
-                    pedalStreamHandler.postDelayed(pedalStreamRunnable, 75L)
-                    true
+                } else {
+                    stopPedalDrive()
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    isGasPressed = false
-                    if (isBrakePressed) {
-                        sendPedalDrivePacket()
-                    } else {
-                        stopPedalDrive()
-                    }
-                    true
-                }
-                else -> false
             }
         }
 
-        btnPedalBrake?.setOnTouchListener { v, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                    isBrakePressed = true
-                    isGasPressed = false
-                    pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+        btnPedalBrake?.onPedalStateChanged = { isDown ->
+            isBrakePressed = isDown
+            if (isDown) {
+                isGasPressed = false
+                pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+                sendPedalDrivePacket()
+                pedalStreamHandler.postDelayed(pedalStreamRunnable, 75L)
+            } else {
+                if (isGasPressed) {
                     sendPedalDrivePacket()
-                    pedalStreamHandler.postDelayed(pedalStreamRunnable, 75L)
-                    true
+                } else {
+                    stopPedalDrive()
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    isBrakePressed = false
-                    if (isGasPressed) {
-                        sendPedalDrivePacket()
-                    } else {
-                        stopPedalDrive()
-                    }
-                    true
-                }
-                else -> false
             }
         }
 
@@ -1047,6 +1051,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             arduinoSender?.stop()
             val currentSpeed = sliderSpeed.value.toInt()
             arduinoSender?.sendCommand("%V$currentSpeed#")
+            arduinoSender?.sendCommand("%$currentSpeed+#")
+            lifecycleScope.launch {
+                delay(60L)
+                arduinoSender?.sendCommand("%G#")
+            }
 
             layoutPortraitMotion?.visibility = View.GONE
             findViewById<View>(R.id.topBar)?.visibility = View.VISIBLE
@@ -1068,6 +1077,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             tvSuperPositionStatus?.text = "Calibrates zero position on every hold"
             tvSuperPositionStatus?.setTextColor(Color.parseColor("#66FCF1"))
             smartCarMotionController?.startListening()
+            lifecycleScope.launch {
+                delay(60L)
+                arduinoSender?.sendCommand("%G#")
+            }
 
             layoutLandscapeDashboard?.visibility = View.GONE
             findViewById<View>(R.id.topBar)?.visibility = View.GONE
@@ -1094,6 +1107,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     .apply()
                 if (arduinoSender?.isConnected == true) {
                     arduinoSender?.sendCommand("%V$spd#")
+                    arduinoSender?.sendCommand("%$spd+#")
                 }
             }
         }
@@ -1143,9 +1157,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         tvMotionTelemetry?.text = "Direction: Center (Brake)"
                         tvMotionPacket?.text = "Packet: %S"
                     } else {
-                        val deg = cmd.substringAfter("@").substringBefore(",")
-                        val pct = cmd.substringAfter(",").substringBefore("#")
-                        val dirLabel = when (deg.toIntOrNull()) {
+                        val deg = cmd.removePrefix("@").removeSuffix("#").toIntOrNull() ?: 90
+                        val dirLabel = when (deg) {
                             in 68..112 -> "FORWARD ($deg°)"
                             in -112..-68 -> "REVERSE ($deg°)"
                             in -22..22 -> "SPIN RIGHT ($deg°)"
@@ -1156,7 +1169,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                             in -157..-113 -> "CURVE REV-LEFT ($deg°)"
                             else -> "$deg°"
                         }
-                        tvMotionTelemetry?.text = "Heading: $dirLabel  Speed: $pct%"
+                        val currentSpeed = sliderSpeed.value.toInt()
+                        tvMotionTelemetry?.text = "Heading: $dirLabel  Speed: $currentSpeed%"
                         tvMotionPacket?.text = "Packet: $cmd"
                     }
                 }
@@ -1233,6 +1247,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                             sender.sendCommand("%M$curRange#")
                             delay(40L)
                             sender.sendCommand("%V$curSpd#")
+                            delay(40L)
+                            sender.sendCommand("%$curSpd+#")
+                            delay(40L)
+                            sender.sendCommand("%G#")
                         }
                     }
                 }
