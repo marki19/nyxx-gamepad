@@ -127,6 +127,7 @@ class ArduinoBluetoothManager(
     private var isUserInitiatedDisconnect = false
     private var reconnectJob: Job? = null
     private var reconnectBackoffMs = 1000L
+    private var reconnectAttempts = 0
 
     fun hasRequiredPermissions(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -160,7 +161,9 @@ class ArduinoBluetoothManager(
         }
 
         isUserInitiatedDisconnect = false
-        targetDeviceAddress = deviceAddress
+        reconnectAttempts = 0
+        val savedMac = appContext.getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE).getString("last_car_mac", null)
+        targetDeviceAddress = if (!deviceAddress.isNullOrBlank()) deviceAddress else savedMac
         targetDeviceName = DEVICE_NAME_DEFAULT
 
         // Clean up previous gatt if any
@@ -170,9 +173,7 @@ class ArduinoBluetoothManager(
 
         connectDeferred = CompletableDeferred()
 
-        // Requirement 1: Scan by device name (use ScanFilter, SCAN_MODE_LOW_LATENCY),
-        // stop scanning on first match or after a timeout (10s), then connect with connectGatt(autoConnect = false, TRANSPORT_LE).
-        startScanAndConnect(deviceAddress)
+        startScanAndConnect(targetDeviceAddress)
 
         val result = withTimeoutOrNull(25000L) {
             connectDeferred?.await()
@@ -199,15 +200,10 @@ class ArduinoBluetoothManager(
             return
         }
 
-        val filters = mutableListOf<ScanFilter>()
-        if (!expectedAddress.isNullOrBlank() && BluetoothAdapter.checkBluetoothAddress(expectedAddress)) {
-            val filterByAddress = ScanFilter.Builder().setDeviceAddress(expectedAddress).build()
-            filters.add(filterByAddress)
+        val filters = if (!expectedAddress.isNullOrBlank() && BluetoothAdapter.checkBluetoothAddress(expectedAddress)) {
+            listOf(ScanFilter.Builder().setDeviceAddress(expectedAddress).build())
         } else {
-            // Match devices advertising the BLE Serial Service (FFE0) so renamed devices are found
-            try {
-                filters.add(ScanFilter.Builder().setServiceUuid(android.os.ParcelUuid(SERVICE_UUID)).build())
-            } catch (_: Exception) {}
+            null
         }
 
         val settings = ScanSettings.Builder()
@@ -221,11 +217,37 @@ class ArduinoBluetoothManager(
                 Log.d(TAG, "Discovered BLE device: $name [${device.address}]")
 
                 val serviceUuids = result.scanRecord?.serviceUuids
-                val matchesService = serviceUuids?.any { it.uuid == SERVICE_UUID } == true
-                val matchesName = name.equals(targetDeviceName, ignoreCase = true) || name.contains("JDY", ignoreCase = true)
-                val matchesAddress = expectedAddress != null && device.address.equals(expectedAddress, ignoreCase = true)
+                val matchesService = serviceUuids?.any { 
+                    it.uuid == SERVICE_UUID || it.uuid.toString().uppercase().contains("FFE0")
+                } == true
 
-                if (matchesService || matchesName || matchesAddress) {
+                val rawBytes = result.scanRecord?.bytes
+                val hasFfe0InBytes = rawBytes?.let { bytes ->
+                    var found = false
+                    for (i in 0 until (bytes.size - 1)) {
+                        if ((bytes[i].toInt() and 0xFF) == 0xE0 && (bytes[i + 1].toInt() and 0xFF) == 0xFF) {
+                            found = true
+                            break
+                        }
+                    }
+                    found
+                } ?: false
+
+                val prefs = appContext.getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
+                val savedCarName = prefs.getString("last_car_name", null)
+                val savedCarMac = prefs.getString("last_car_mac", null)
+
+                val matchesName = (savedCarName != null && name.equals(savedCarName, ignoreCase = true)) ||
+                                  name.contains("JDY", ignoreCase = true) ||
+                                  name.contains("mark", ignoreCase = true) ||
+                                  name.contains("car", ignoreCase = true) ||
+                                  name.contains("robot", ignoreCase = true) ||
+                                  name.equals(targetDeviceName, ignoreCase = true)
+
+                val matchesAddress = (expectedAddress != null && device.address.equals(expectedAddress, ignoreCase = true)) ||
+                                     (savedCarMac != null && device.address.equals(savedCarMac, ignoreCase = true))
+
+                if (matchesService || hasFfe0InBytes || matchesName || matchesAddress) {
                     connectedDeviceName = if (name.isNotBlank()) name else (device.name ?: "Robot Car")
                     Log.i(TAG, "Target car matched ($connectedDeviceName)! Stopping scan and connecting...")
                     stopScan()
@@ -516,11 +538,21 @@ class ArduinoBluetoothManager(
 
     private fun onSuccessfullyConnected() {
         reconnectBackoffMs = 1000L
+        reconnectAttempts = 0
         _connectionState.value = BleConnectionState.Connected
         startWriteQueue()
         connectDeferred?.complete(true)
         connectDeferred = null
-        Log.i(TAG, "Successfully connected to JDY-16!")
+
+        val device = bluetoothGatt?.device
+        if (device != null) {
+            val prefs = appContext.getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString("last_car_mac", device.address)
+                .putString("last_car_name", connectedDeviceName)
+                .apply()
+        }
+        Log.i(TAG, "Successfully connected to $connectedDeviceName [${device?.address}]!")
     }
 
     private fun startWriteQueue() {
@@ -696,13 +728,20 @@ class ArduinoBluetoothManager(
 
     private fun scheduleReconnect(delayMs: Long? = null) {
         if (isUserInitiatedDisconnect) return
+        reconnectAttempts++
+        if (reconnectAttempts > 3) {
+            Log.w(TAG, "Reconnect attempts exceeded (3). Stopping auto-reconnect.")
+            reconnectJob?.cancel()
+            _connectionState.value = BleConnectionState.Disconnected
+            return
+        }
         reconnectJob?.cancel()
         _connectionState.value = BleConnectionState.Reconnecting
 
         val waitTime = delayMs ?: reconnectBackoffMs
-        reconnectBackoffMs = (reconnectBackoffMs * 2).coerceAtMost(10000L)
+        reconnectBackoffMs = (reconnectBackoffMs * 2).coerceAtMost(8000L)
 
-        Log.i(TAG, "Scheduling auto-reconnect in ${waitTime}ms (next backoff: ${reconnectBackoffMs}ms)")
+        Log.i(TAG, "Scheduling auto-reconnect attempt $reconnectAttempts in ${waitTime}ms")
         reconnectJob = scope.launch(Dispatchers.Main) {
             delay(waitTime)
             if (!isUserInitiatedDisconnect && _connectionState.value != BleConnectionState.Connected) {

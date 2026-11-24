@@ -45,7 +45,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -469,7 +473,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             return
         }
 
-        robotCarMac = intent.getStringExtra("MAC_ADDRESS")
+        val savedMac = getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE).getString("last_car_mac", null)
+        robotCarMac = intent.getStringExtra("MAC_ADDRESS") ?: savedMac
         arduinoSender = ArduinoBluetoothManager(this, adapter)
 
         setupRobotCarUi()
@@ -600,7 +605,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         btnReconnect.applyInteractivePress {
-            connectArduinoCar()
+            showBleDevicePicker()
         }
 
         // Distance Slider throttling and persistence
@@ -898,6 +903,81 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         lifecycleScope.launch {
             arduinoSender?.connectToCar(robotCarMac)
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun showBleDevicePicker() {
+        val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+        val scanner = adapter?.bluetoothLeScanner
+        if (adapter == null || !adapter.isEnabled || scanner == null) {
+            Toast.makeText(this, "Bluetooth must be enabled to scan", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val discoveredDevices = mutableListOf<BluetoothDevice>()
+        val deviceLabels = mutableListOf<String>()
+
+        val arrayAdapter = android.widget.ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_1,
+            deviceLabels
+        )
+
+        var scanCallback: ScanCallback? = null
+
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Select Bluetooth Car")
+            .setAdapter(arrayAdapter) { _, which ->
+                val chosenDevice = discoveredDevices.getOrNull(which)
+                if (chosenDevice != null) {
+                    val prefs = getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
+                    val devName = chosenDevice.name ?: "Robot Car"
+                    prefs.edit()
+                        .putString("last_car_mac", chosenDevice.address)
+                        .putString("last_car_name", devName)
+                        .apply()
+                    robotCarMac = chosenDevice.address
+                    Toast.makeText(this, "Connecting to $devName...", Toast.LENGTH_SHORT).show()
+                    connectArduinoCar()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .setOnDismissListener {
+                try {
+                    scanCallback?.let { scanner.stopScan(it) }
+                } catch (_: Exception) {}
+            }
+            .create()
+
+        scanCallback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                val device = result?.device ?: return
+                val name = result.scanRecord?.deviceName ?: device.name ?: ""
+                val address = device.address
+
+                if (discoveredDevices.none { it.address.equals(address, ignoreCase = true) }) {
+                    discoveredDevices.add(device)
+                    val displayName = if (name.isNotBlank()) name else "Unknown Device"
+                    val label = "$displayName\n$address  (${result.rssi} dBm)"
+                    deviceLabels.add(label)
+                    runOnUiThread { arrayAdapter.notifyDataSetChanged() }
+                }
+            }
+        }
+
+        val scanSettings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .build()
+
+        scanner.startScan(null, scanSettings, scanCallback)
+        dialog.show()
+
+        lifecycleScope.launch {
+            delay(12000L)
+            try {
+                scanCallback?.let { scanner.stopScan(it) }
+            } catch (_: Exception) {}
         }
     }
 

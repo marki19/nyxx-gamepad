@@ -162,16 +162,17 @@ class HomeActivity : AppCompatActivity() {
                 Toast.makeText(this, "Bluetooth not supported on this device", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            val savedMac = getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE).getString("last_car_mac", null)
             if (!adapter.isEnabled) {
                 try {
                     @Suppress("DEPRECATION")
                     val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                     enableBtLauncher.launch(enableBtIntent)
                 } catch (_: Exception) {
-                    launchArduinoMode(null)
+                    launchArduinoMode(savedMac)
                 }
             } else {
-                launchArduinoMode(null)
+                launchArduinoMode(savedMac)
             }
         }
     }
