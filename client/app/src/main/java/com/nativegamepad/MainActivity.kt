@@ -498,6 +498,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val tvDistanceValue = findViewById<TextView>(R.id.tvDistanceValue)
         val sliderDistance = findViewById<Slider>(R.id.sliderDistance)
 
+        val cardFollowNear = findViewById<LinearLayout>(R.id.cardFollowNear)
+        val tvFollowNearValue = findViewById<TextView>(R.id.tvFollowNearValue)
+        val sliderFollowNear = findViewById<Slider>(R.id.sliderFollowNear)
+
+        val cardFollowFar = findViewById<LinearLayout>(R.id.cardFollowFar)
+        val tvFollowFarValue = findViewById<TextView>(R.id.tvFollowFarValue)
+        val sliderFollowFar = findViewById<Slider>(R.id.sliderFollowFar)
+
+        val cardFollowRange = findViewById<LinearLayout>(R.id.cardFollowRange)
+        val tvFollowRangeValue = findViewById<TextView>(R.id.tvFollowRangeValue)
+        val sliderFollowRange = findViewById<Slider>(R.id.sliderFollowRange)
+
         val cardSpeed = findViewById<LinearLayout>(R.id.cardSpeed)
         val tvSpeedValue = findViewById<TextView>(R.id.tvSpeedValue)
         val sliderSpeed = findViewById<Slider>(R.id.sliderSpeed)
@@ -510,10 +522,22 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         val prefs = getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
         val savedDist = prefs.getInt("obstacle_dist", 35).coerceIn(10, 100)
+        val savedFollowNear = prefs.getInt("follow_near", 5).coerceIn(2, 25)
+        val savedFollowFar = prefs.getInt("follow_far", 8).coerceIn(4, 40)
+        val savedFollowRange = prefs.getInt("follow_range", 60).coerceIn(20, 150)
         val savedSpeed = prefs.getInt("cruise_speed", 70).coerceIn(0, 100)
 
         sliderDistance.value = savedDist.toFloat()
         tvDistanceValue.text = "$savedDist cm"
+
+        sliderFollowNear.value = savedFollowNear.toFloat()
+        tvFollowNearValue.text = "$savedFollowNear cm"
+
+        sliderFollowFar.value = savedFollowFar.toFloat()
+        tvFollowFarValue.text = "$savedFollowFar cm"
+
+        sliderFollowRange.value = savedFollowRange.toFloat()
+        tvFollowRangeValue.text = "$savedFollowRange cm"
 
         sliderSpeed.value = savedSpeed.toFloat()
         tvSpeedValue.text = "$savedSpeed %"
@@ -527,6 +551,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             btnStop.alpha = if (enabled) 1.0f else 0.5f
             sliderDistance.isEnabled = enabled
             sliderDistance.alpha = if (enabled) 1.0f else 0.5f
+            sliderFollowNear.isEnabled = enabled
+            sliderFollowNear.alpha = if (enabled) 1.0f else 0.5f
+            sliderFollowFar.isEnabled = enabled
+            sliderFollowFar.alpha = if (enabled) 1.0f else 0.5f
+            sliderFollowRange.isEnabled = enabled
+            sliderFollowRange.alpha = if (enabled) 1.0f else 0.5f
             sliderSpeed.isEnabled = true
             btnTiltSteer?.isEnabled = true
             btnTiltSteer?.alpha = if (enabled) 1.0f else 0.85f
@@ -637,6 +667,90 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         })
 
+        // Follow Near Slider (Back Away Limit)
+        var lastFollowNearSendTime = 0L
+        var lastFollowNearSent = savedFollowNear
+        sliderFollowNear.addOnChangeListener { _, value, fromUser ->
+            val v = value.toInt()
+            tvFollowNearValue.text = "$v cm"
+            if (fromUser && arduinoSender?.isConnected == true) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastFollowNearSendTime >= 100L) {
+                    lastFollowNearSendTime = now
+                    lastFollowNearSent = v
+                    arduinoSender?.sendCommand("%N$v#")
+                }
+            }
+        }
+        sliderFollowNear.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                val v = slider.value.toInt()
+                tvFollowNearValue.text = "$v cm"
+                prefs.edit().putInt("follow_near", v).apply()
+                if (arduinoSender?.isConnected == true && v != lastFollowNearSent) {
+                    lastFollowNearSent = v
+                    arduinoSender?.sendCommand("%N$v#")
+                }
+            }
+        })
+
+        // Follow Far Slider (Catch/Chase Limit)
+        var lastFollowFarSendTime = 0L
+        var lastFollowFarSent = savedFollowFar
+        sliderFollowFar.addOnChangeListener { _, value, fromUser ->
+            val v = value.toInt()
+            tvFollowFarValue.text = "$v cm"
+            if (fromUser && arduinoSender?.isConnected == true) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastFollowFarSendTime >= 100L) {
+                    lastFollowFarSendTime = now
+                    lastFollowFarSent = v
+                    arduinoSender?.sendCommand("%C$v#")
+                }
+            }
+        }
+        sliderFollowFar.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                val v = slider.value.toInt()
+                tvFollowFarValue.text = "$v cm"
+                prefs.edit().putInt("follow_far", v).apply()
+                if (arduinoSender?.isConnected == true && v != lastFollowFarSent) {
+                    lastFollowFarSent = v
+                    arduinoSender?.sendCommand("%C$v#")
+                }
+            }
+        })
+
+        // Follow Range Slider (Max Search Range)
+        var lastFollowRangeSendTime = 0L
+        var lastFollowRangeSent = savedFollowRange
+        sliderFollowRange.addOnChangeListener { _, value, fromUser ->
+            val v = value.toInt()
+            tvFollowRangeValue.text = "$v cm"
+            if (fromUser && arduinoSender?.isConnected == true) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastFollowRangeSendTime >= 100L) {
+                    lastFollowRangeSendTime = now
+                    lastFollowRangeSent = v
+                    arduinoSender?.sendCommand("%M$v#")
+                }
+            }
+        }
+        sliderFollowRange.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                val v = slider.value.toInt()
+                tvFollowRangeValue.text = "$v cm"
+                prefs.edit().putInt("follow_range", v).apply()
+                if (arduinoSender?.isConnected == true && v != lastFollowRangeSent) {
+                    lastFollowRangeSent = v
+                    arduinoSender?.sendCommand("%M$v#")
+                }
+            }
+        })
+
         // Speed Slider throttling and persistence
         var lastSpeedSendTime = 0L
         var lastSpeedSent = savedSpeed
@@ -698,6 +812,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 cardDistance.setBackgroundResource(R.drawable.card_highlight_bg)
             } else {
                 cardDistance.setBackgroundResource(R.drawable.bg_dark_card)
+            }
+
+            // Highlight follow sliders when Object Follow mode is active
+            if (activeCmd == "%F#") {
+                cardFollowNear.setBackgroundResource(R.drawable.card_highlight_bg)
+                cardFollowFar.setBackgroundResource(R.drawable.card_highlight_bg)
+                cardFollowRange.setBackgroundResource(R.drawable.card_highlight_bg)
+            } else {
+                cardFollowNear.setBackgroundResource(R.drawable.bg_dark_card)
+                cardFollowFar.setBackgroundResource(R.drawable.bg_dark_card)
+                cardFollowRange.setBackgroundResource(R.drawable.bg_dark_card)
             }
         }
 
@@ -845,9 +970,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         setControlsEnabled(true)
                         lifecycleScope.launch {
                             val curDist = prefs.getInt("obstacle_dist", 35)
+                            val curNear = prefs.getInt("follow_near", 5)
+                            val curFar = prefs.getInt("follow_far", 8)
+                            val curRange = prefs.getInt("follow_range", 60)
                             val curSpd = prefs.getInt("cruise_speed", 70)
                             sender.sendCommand("%D$curDist#")
-                            delay(50L)
+                            delay(40L)
+                            sender.sendCommand("%N$curNear#")
+                            delay(40L)
+                            sender.sendCommand("%C$curFar#")
+                            delay(40L)
+                            sender.sendCommand("%M$curRange#")
+                            delay(40L)
                             sender.sendCommand("%V$curSpd#")
                         }
                     }

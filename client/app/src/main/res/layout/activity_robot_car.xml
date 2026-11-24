@@ -207,102 +207,264 @@
                 android:letterSpacing="0.1"
                 android:layout_marginBottom="8dp" />
 
-            <!-- Distance Slider Container -->
-            <LinearLayout
-                android:id="@+id/cardDistance"
+            <!-- Scrollable Tuning Sliders -->
+            <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_dark_card"
-                android:padding="6dp"
-                android:layout_marginBottom="6dp">
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true"
+                android:scrollbars="none">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <!-- 1. Obstacle Avoid Distance -->
+                    <LinearLayout
+                        android:id="@+id/cardDistance"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Distance"
-                        android:textColor="#C5C6C7"
-                        android:textSize="11sp"
-                        android:fontFamily="sans-serif-medium" />
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_dark_card"
+                        android:padding="6dp"
+                        android:layout_marginBottom="6dp">
 
-                    <TextView
-                        android:id="@+id/tvDistanceValue"
-                        android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Obstacle Avoid Distance"
+                                android:textColor="#C5C6C7"
+                                android:textSize="11sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:id="@+id/tvDistanceValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="35 cm"
+                                android:textColor="#66FCF1"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderDistance"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:valueFrom="10.0"
+                            android:valueTo="100.0"
+                            android:stepSize="1.0"
+                            android:value="35.0"
+                            app:thumbColor="#66FCF1"
+                            app:trackColorActive="#45A29E"
+                            app:trackColorInactive="#22FFFFFF" />
+                    </LinearLayout>
+
+                    <!-- 2. Follow Near Limit (Back Away) -->
+                    <LinearLayout
+                        android:id="@+id/cardFollowNear"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="35 cm"
-                        android:textColor="#66FCF1"
-                        android:textSize="11sp"
-                        android:fontFamily="monospace"
-                        android:textStyle="bold" />
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_dark_card"
+                        android:padding="6dp"
+                        android:layout_marginBottom="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Follow Near Limit (Back Away)"
+                                android:textColor="#C5C6C7"
+                                android:textSize="11sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:id="@+id/tvFollowNearValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="5 cm"
+                                android:textColor="#66FCF1"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderFollowNear"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:valueFrom="2.0"
+                            android:valueTo="25.0"
+                            android:stepSize="1.0"
+                            android:value="5.0"
+                            app:thumbColor="#66FCF1"
+                            app:trackColorActive="#45A29E"
+                            app:trackColorInactive="#22FFFFFF" />
+                    </LinearLayout>
+
+                    <!-- 3. Follow Catch Limit (Chase) -->
+                    <LinearLayout
+                        android:id="@+id/cardFollowFar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_dark_card"
+                        android:padding="6dp"
+                        android:layout_marginBottom="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Follow Catch Limit (Chase)"
+                                android:textColor="#C5C6C7"
+                                android:textSize="11sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:id="@+id/tvFollowFarValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="8 cm"
+                                android:textColor="#66FCF1"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderFollowFar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:valueFrom="4.0"
+                            android:valueTo="40.0"
+                            android:stepSize="1.0"
+                            android:value="8.0"
+                            app:thumbColor="#66FCF1"
+                            app:trackColorActive="#45A29E"
+                            app:trackColorInactive="#22FFFFFF" />
+                    </LinearLayout>
+
+                    <!-- 4. Follow Max Range (Ignore) -->
+                    <LinearLayout
+                        android:id="@+id/cardFollowRange"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_dark_card"
+                        android:padding="6dp"
+                        android:layout_marginBottom="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Follow Max Range (Ignore)"
+                                android:textColor="#C5C6C7"
+                                android:textSize="11sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:id="@+id/tvFollowRangeValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="60 cm"
+                                android:textColor="#66FCF1"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderFollowRange"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:valueFrom="20.0"
+                            android:valueTo="150.0"
+                            android:stepSize="5.0"
+                            android:value="60.0"
+                            app:thumbColor="#66FCF1"
+                            app:trackColorActive="#45A29E"
+                            app:trackColorInactive="#22FFFFFF" />
+                    </LinearLayout>
+
+                    <!-- 5. Cruise Speed -->
+                    <LinearLayout
+                        android:id="@+id/cardSpeed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_dark_card"
+                        android:padding="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Cruise Speed"
+                                android:textColor="#C5C6C7"
+                                android:textSize="11sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:id="@+id/tvSpeedValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="70 %"
+                                android:textColor="#66FCF1"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderSpeed"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:valueFrom="0.0"
+                            android:valueTo="100.0"
+                            android:stepSize="1.0"
+                            android:value="70.0"
+                            app:thumbColor="#66FCF1"
+                            app:trackColorActive="#45A29E"
+                            app:trackColorInactive="#22FFFFFF" />
+                    </LinearLayout>
                 </LinearLayout>
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderDistance"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:valueFrom="10.0"
-                    android:valueTo="100.0"
-                    android:stepSize="1.0"
-                    android:value="35.0"
-                    app:thumbColor="#66FCF1"
-                    app:trackColorActive="#45A29E"
-                    app:trackColorInactive="#22FFFFFF" />
-            </LinearLayout>
-
-            <!-- Speed Slider Container -->
-            <LinearLayout
-                android:id="@+id/cardSpeed"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_dark_card"
-                android:padding="6dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Cruise Speed"
-                        android:textColor="#C5C6C7"
-                        android:textSize="11sp"
-                        android:fontFamily="sans-serif-medium" />
-
-                    <TextView
-                        android:id="@+id/tvSpeedValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="70 %"
-                        android:textColor="#66FCF1"
-                        android:textSize="11sp"
-                        android:fontFamily="monospace"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderSpeed"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:valueFrom="0.0"
-                    android:valueTo="100.0"
-                    android:stepSize="1.0"
-                    android:value="70.0"
-                    app:thumbColor="#66FCF1"
-                    app:trackColorActive="#45A29E"
-                    app:trackColorInactive="#22FFFFFF" />
-            </LinearLayout>
+            </ScrollView>
 
             <!-- Motion Controls (Hold to Drive) -->
             <LinearLayout
