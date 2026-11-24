@@ -526,11 +526,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             btnStop.isEnabled = enabled
             btnStop.alpha = if (enabled) 1.0f else 0.5f
             sliderDistance.isEnabled = enabled
-            sliderSpeed.isEnabled = enabled
-            btnTiltSteer?.isEnabled = enabled
-            btnTiltSteer?.alpha = if (enabled) 1.0f else 0.5f
-            btnAirMove?.isEnabled = enabled
-            btnAirMove?.alpha = if (enabled) 1.0f else 0.5f
+            sliderDistance.alpha = if (enabled) 1.0f else 0.5f
+            sliderSpeed.isEnabled = true
+            btnTiltSteer?.isEnabled = true
+            btnTiltSteer?.alpha = if (enabled) 1.0f else 0.85f
+            btnAirMove?.isEnabled = true
+            btnAirMove?.alpha = if (enabled) 1.0f else 0.85f
         }
         setControlsEnabled(false)
 
@@ -841,19 +842,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         tvStatus.setTextColor(Color.parseColor("#66FCF1"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#66FCF1"))
 
-                        // Requirement C: Send initial saved parameters after connecting before enabling modes
-                        sliderDistance.isEnabled = true
-                        sliderSpeed.isEnabled = true
+                        setControlsEnabled(true)
                         lifecycleScope.launch {
                             val curDist = prefs.getInt("obstacle_dist", 35)
                             val curSpd = prefs.getInt("cruise_speed", 70)
                             sender.sendCommand("%D$curDist#")
                             delay(50L)
                             sender.sendCommand("%V$curSpd#")
-                            delay(50L)
-                            modeButtons.forEach { it.isEnabled = true; it.alpha = 1.0f }
-                            btnStop.isEnabled = true
-                            btnStop.alpha = 1.0f
                         }
                     }
                 }
