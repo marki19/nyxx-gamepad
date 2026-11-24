@@ -5,6 +5,8 @@ import android.content.pm.ActivityInfo
 import androidx.activity.OnBackPressedCallback
 import android.os.Bundle
 import android.os.BatteryManager
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 import android.view.View
 import android.view.MotionEvent
@@ -520,7 +522,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         val layoutJoystickContainer = findViewById<LinearLayout>(R.id.layoutJoystickContainer)
         val tvJoystickAngle = findViewById<TextView>(R.id.tvJoystickAngle)
-        val virtualJoystick = findViewById<VirtualJoystickView>(R.id.virtualJoystick)
+        val steeringWheel = findViewById<SteeringWheelView>(R.id.steeringWheel)
+        val btnPedalGas = findViewById<Button>(R.id.btnPedalGas)
+        val btnPedalBrake = findViewById<Button>(R.id.btnPedalBrake)
 
         val modeButtons = listOf(btnAvoid, btnFollow, btnLine, btnLight)
 
@@ -562,6 +566,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             sliderFollowRange.isEnabled = enabled
             sliderFollowRange.alpha = if (enabled) 1.0f else 0.5f
             sliderSpeed.isEnabled = true
+            steeringWheel?.isEnabled = enabled
+            steeringWheel?.alpha = if (enabled) 1.0f else 0.5f
+            btnPedalGas?.isEnabled = enabled
+            btnPedalGas?.alpha = if (enabled) 1.0f else 0.5f
+            btnPedalBrake?.isEnabled = enabled
+            btnPedalBrake?.alpha = if (enabled) 1.0f else 0.5f
             btnAirMove?.isEnabled = true
             btnAirMove?.alpha = if (enabled) 1.0f else 0.85f
             btnHoldToDrive?.isEnabled = enabled
@@ -802,13 +812,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 btn.refreshDrawableState()
             }
 
-            // Left movement joystick state in landscape
+            // Steering wheel & pedal states in landscape
             if (activeCmd != null) {
                 tvJoystickAngle?.text = "Auto Active"
-                virtualJoystick?.alpha = 0.5f
+                steeringWheel?.alpha = 0.5f
+                btnPedalGas?.alpha = 0.5f
+                btnPedalBrake?.alpha = 0.5f
             } else {
-                tvJoystickAngle?.text = "Touch to steer"
-                virtualJoystick?.alpha = 1.0f
+                tvJoystickAngle?.text = "Center (0°)"
+                steeringWheel?.alpha = 1.0f
+                btnPedalGas?.alpha = 1.0f
+                btnPedalBrake?.alpha = 1.0f
             }
 
             // Highlight distance slider when Obstacle Avoidance mode is active
@@ -853,7 +867,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         fun stopAllModesAndMotion() {
             smartCarMotionController?.stopHold()
-            virtualJoystick?.resetKnobPosition()
+            steeringWheel?.resetToCenter()
             robotModeJob?.cancel()
             activeRobotModeCmd = null
             arduinoSender?.stop()
@@ -870,15 +884,90 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             stopAllModesAndMotion()
         }
 
-        // 360° Virtual Analog Joystick (Left Side)
-        virtualJoystick?.onDirectionChanged = { degree ->
-            tvJoystickAngle?.text = "Steering: $degree°"
-            arduinoSender?.joystick(degree)
+        // Interactive Steering Wheel & Pedal Drive Engine
+        var isGasPressed = false
+        var isBrakePressed = false
+        var currentSteerAngle = 0f
+
+        fun updatePedalDrive() {
+            if (activeRobotModeCmd != null) return
+
+            if (isGasPressed && !isBrakePressed) {
+                // Forward drive: 0° wheel = 90° Arduino; left < 0 curves to 180°; right > 0 curves to 0°
+                val driveAngle = (90f - currentSteerAngle).roundToInt().coerceIn(0, 180)
+                arduinoSender?.joystick(driveAngle)
+                val steerLabel = when {
+                    currentSteerAngle < -6f -> "◄ LEFT ${abs(currentSteerAngle).roundToInt()}°"
+                    currentSteerAngle > 6f -> "RIGHT ${currentSteerAngle.roundToInt()}° ►"
+                    else -> "STRAIGHT"
+                }
+                tvJoystickAngle?.text = "GAS: $steerLabel ($driveAngle°)"
+                tvJoystickAngle?.setTextColor(Color.parseColor("#66FCF1"))
+            } else if (isBrakePressed && !isGasPressed) {
+                // Reverse drive: 0° wheel = -90° Arduino; left < 0 curves to -180°; right > 0 curves to 0°
+                val driveAngle = (-90f + currentSteerAngle).roundToInt().coerceIn(-180, 0)
+                arduinoSender?.joystick(driveAngle)
+                val steerLabel = when {
+                    currentSteerAngle < -6f -> "◄ LEFT ${abs(currentSteerAngle).roundToInt()}°"
+                    currentSteerAngle > 6f -> "RIGHT ${currentSteerAngle.roundToInt()}° ►"
+                    else -> "STRAIGHT"
+                }
+                tvJoystickAngle?.text = "REV: $steerLabel ($driveAngle°)"
+                tvJoystickAngle?.setTextColor(Color.parseColor("#FF5C5C"))
+            } else {
+                arduinoSender?.stop()
+                val steerLabel = when {
+                    currentSteerAngle < -6f -> "◄ LEFT ${abs(currentSteerAngle).roundToInt()}°"
+                    currentSteerAngle > 6f -> "RIGHT ${currentSteerAngle.roundToInt()}° ►"
+                    else -> "Center (0°)"
+                }
+                tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Wheel: $steerLabel"
+                tvJoystickAngle?.setTextColor(Color.parseColor("#8B949E"))
+            }
         }
 
-        virtualJoystick?.onReleased = {
-            tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Touch to steer"
-            arduinoSender?.stop()
+        steeringWheel?.onAngleChanged = { angle ->
+            currentSteerAngle = angle
+            updatePedalDrive()
+        }
+
+        steeringWheel?.onReleased = {
+            currentSteerAngle = 0f
+            updatePedalDrive()
+        }
+
+        btnPedalGas?.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    isGasPressed = true
+                    updatePedalDrive()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    isGasPressed = false
+                    updatePedalDrive()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        btnPedalBrake?.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    isBrakePressed = true
+                    updatePedalDrive()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    isBrakePressed = false
+                    updatePedalDrive()
+                    true
+                }
+                else -> false
+            }
         }
 
         setupHoldToDriveButton(findViewById(R.id.btnSpinLeft), "%L")
@@ -927,7 +1016,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 closeMotionScreen()
                 true
             }
-            val currentSpd = sliderSpeed.value
+            val currentSpd = sliderSpeed.value.coerceIn(0f, 100f)
             sliderMotionSpeed?.value = currentSpd
             tvMotionSpeedLabel?.text = "Cruise Speed: ${currentSpd.toInt()}%"
             motionJoystickRadar?.resetKnobPosition()
@@ -1002,7 +1091,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             },
             onDotUpdated = { normX, normY, cmd ->
                 runOnUiThread {
-                    virtualJoystick?.setExternalKnobPosition(normX, normY)
                     motionJoystickRadar?.setExternalKnobPosition(normX, normY)
                     tvJoystickAngle?.text = if (cmd == "%S") "Motion: Center" else "Motion: $cmd"
 
