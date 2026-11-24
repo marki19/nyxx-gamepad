@@ -46,6 +46,7 @@ class SmartCarMotionController(
     // Normalized [-1f..1f] steering coordinates
     private var normX = 0f
     private var normY = 0f
+    private var isDriving = false
 
     private val streamRunnable = object : Runnable {
         override fun run() {
@@ -60,6 +61,7 @@ class SmartCarMotionController(
         stopHold(sendStop = false)
         activeMode = mode
         hasReference = false
+        isDriving = false
         normX = 0f
         normY = 0f
 
@@ -74,6 +76,7 @@ class SmartCarMotionController(
     /** Call on button RELEASE (ACTION_UP / ACTION_CANCEL). Immediately brakes the car. */
     fun stopHold(sendStop: Boolean = true) {
         activeMode = Mode.NONE
+        isDriving = false
         handler.removeCallbacks(streamRunnable)
         sensorManager.unregisterListener(this)
         normX = 0f
@@ -148,17 +151,23 @@ class SmartCarMotionController(
     }
 
     private fun computeAndSend() {
-        val deadzone = 0.15f
         val mag = hypot(normX, normY)
+        // Hysteresis deadzone: requires 0.18 to begin driving, remains driving until dropping below 0.08
+        val deadzone = if (isDriving) 0.08f else 0.18f
 
         if (mag < deadzone) {
-            sendBluetooth("%S")
-            onDotUpdated?.invoke(normX, normY, "%S")
+            if (isDriving) {
+                isDriving = false
+                sendBluetooth("%S")
+                onDotUpdated?.invoke(0f, 0f, "%S")
+            }
             return
         }
 
+        isDriving = true
+
         // Snap pure left/right movement to spin in place (0 deg right, 180 deg left)
-        val deg = if (abs(normY) < deadzone * 0.75f) {
+        val deg = if (abs(normY) < 0.12f) {
             if (normX > 0f) 0 else 180
         } else {
             (atan2(normY, normX) * (180.0 / PI)).roundToInt()
