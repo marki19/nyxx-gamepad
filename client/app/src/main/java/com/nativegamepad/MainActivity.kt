@@ -546,7 +546,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sliderSpeed.value = savedSpeed.toFloat()
         tvSpeedValue.text = "$savedSpeed %"
 
-        val btnTiltSteer = findViewById<Button>(R.id.btnTiltSteer)
         val btnAirMove = findViewById<Button>(R.id.btnAirMove)
         val btnHoldToDrive = findViewById<Button>(R.id.btnHoldToDrive)
 
@@ -563,8 +562,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             sliderFollowRange.isEnabled = enabled
             sliderFollowRange.alpha = if (enabled) 1.0f else 0.5f
             sliderSpeed.isEnabled = true
-            btnTiltSteer?.isEnabled = true
-            btnTiltSteer?.alpha = if (enabled) 1.0f else 0.85f
             btnAirMove?.isEnabled = true
             btnAirMove?.alpha = if (enabled) 1.0f else 0.85f
             btnHoldToDrive?.isEnabled = enabled
@@ -890,51 +887,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             stopAllModesAndMotion()
         }
 
-        // Portrait Motion Screen views
+        // Portrait Air Move Screen views
         val layoutLandscapeDashboard = findViewById<LinearLayout>(R.id.layoutLandscapeDashboard)
         val layoutPortraitMotion = findViewById<LinearLayout>(R.id.layoutPortraitMotion)
         val btnMotionBack = findViewById<Button>(R.id.btnMotionBack)
         val viewMotionStatusDot = findViewById<View>(R.id.viewMotionStatusDot)
         val tvMotionStatus = findViewById<TextView>(R.id.tvMotionStatus)
-        val btnTabTiltSteer = findViewById<Button>(R.id.btnTabTiltSteer)
-        val btnTabAirMove = findViewById<Button>(R.id.btnTabAirMove)
-        val tvMotionInstruction = findViewById<TextView>(R.id.tvMotionInstruction)
-        val motionJoystickRadar = findViewById<VirtualJoystickView>(R.id.motionJoystickRadar)
         val tvMotionTelemetry = findViewById<TextView>(R.id.tvMotionTelemetry)
         val tvMotionPacket = findViewById<TextView>(R.id.tvMotionPacket)
         val tvMotionSpeedLabel = findViewById<TextView>(R.id.tvMotionSpeedLabel)
         val sliderMotionSpeed = findViewById<Slider>(R.id.sliderMotionSpeed)
 
-        motionJoystickRadar?.setOnTouchListener { _, _ -> true }
-
-        var currentMotionMode = SmartCarMotionController.Mode.TILT_STEER
         var isMotionScreenOpen = false
-
-        fun updateMotionTabUI(mode: SmartCarMotionController.Mode) {
-            currentMotionMode = mode
-            if (mode == SmartCarMotionController.Mode.TILT_STEER) {
-                btnTabTiltSteer?.isSelected = true
-                btnTabTiltSteer?.setTextColor(Color.parseColor("#FFFFFF"))
-                btnTabAirMove?.isSelected = false
-                btnTabAirMove?.setTextColor(Color.parseColor("#8B949E"))
-                tvMotionInstruction?.text = "Hold button & tilt phone like a steering wheel"
-                btnHoldToDrive?.text = "HOLD TO STEER"
-            } else {
-                btnTabTiltSteer?.isSelected = false
-                btnTabTiltSteer?.setTextColor(Color.parseColor("#8B949E"))
-                btnTabAirMove?.isSelected = true
-                btnTabAirMove?.setTextColor(Color.parseColor("#FFFFFF"))
-                tvMotionInstruction?.text = "Hold button & move phone in the air"
-                btnHoldToDrive?.text = "HOLD TO AIR MOVE"
-            }
-        }
 
         fun closeMotionScreen() {
             if (!isMotionScreenOpen) return
             isMotionScreenOpen = false
             onBackPressCustomAction = null
             smartCarMotionController?.stopHold()
-            motionJoystickRadar?.resetKnobPosition()
             arduinoSender?.stop()
             val currentSpeed = sliderSpeed.value.toInt()
             arduinoSender?.sendCommand("%V$currentSpeed#")
@@ -945,14 +915,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
 
-        fun openMotionScreen(mode: SmartCarMotionController.Mode) {
+        fun openMotionScreen() {
             stopAllModesAndMotion()
             isMotionScreenOpen = true
             onBackPressCustomAction = {
                 closeMotionScreen()
                 true
             }
-            updateMotionTabUI(mode)
             val currentSpd = sliderSpeed.value
             sliderMotionSpeed?.value = currentSpd
             tvMotionSpeedLabel?.text = "Cruise Speed: ${currentSpd.toInt()}%"
@@ -963,28 +932,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
 
-        btnTiltSteer?.applyInteractivePress {
-            openMotionScreen(SmartCarMotionController.Mode.TILT_STEER)
-        }
         btnAirMove?.applyInteractivePress {
-            openMotionScreen(SmartCarMotionController.Mode.AIR_MOVE)
+            openMotionScreen()
         }
         btnMotionBack?.applyInteractivePress {
             closeMotionScreen()
-        }
-        btnTabTiltSteer?.applyInteractivePress {
-            if (currentMotionMode != SmartCarMotionController.Mode.TILT_STEER) {
-                smartCarMotionController?.stopHold()
-                motionJoystickRadar?.resetKnobPosition()
-                updateMotionTabUI(SmartCarMotionController.Mode.TILT_STEER)
-            }
-        }
-        btnTabAirMove?.applyInteractivePress {
-            if (currentMotionMode != SmartCarMotionController.Mode.AIR_MOVE) {
-                smartCarMotionController?.stopHold()
-                motionJoystickRadar?.resetKnobPosition()
-                updateMotionTabUI(SmartCarMotionController.Mode.AIR_MOVE)
-            }
         }
 
         sliderMotionSpeed?.addOnChangeListener { _, value, fromUser ->
@@ -1008,13 +960,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 MotionEvent.ACTION_DOWN -> {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     v.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#45A29E"))
-                    smartCarMotionController?.startHold(currentMotionMode)
+                    smartCarMotionController?.startHold(SmartCarMotionController.Mode.AIR_MOVE)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.backgroundTintList = null
                     smartCarMotionController?.stopHold()
-                    motionJoystickRadar?.resetKnobPosition()
                     tvMotionTelemetry?.text = "Direction: Center (Brake)"
                     tvMotionPacket?.text = "Packet: %S"
                     val currentSpeed = sliderSpeed.value.toInt()
@@ -1025,7 +976,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        // Motion Controls (Tilt Steer & Air Move Engine)
+        // Air Move Motion Engine
         smartCarMotionController = SmartCarMotionController(
             context = this,
             sendBluetooth = { cmd ->
@@ -1038,7 +989,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             onDotUpdated = { normX, normY, cmd ->
                 runOnUiThread {
                     virtualJoystick?.setExternalKnobPosition(normX, normY)
-                    motionJoystickRadar?.setExternalKnobPosition(normX, normY)
                     tvJoystickAngle?.text = if (cmd == "%S") "Motion: Center" else "Motion: $cmd"
 
                     if (cmd == "%S") {
