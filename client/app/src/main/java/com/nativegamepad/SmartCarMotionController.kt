@@ -32,6 +32,7 @@ class SmartCarMotionController(
 
     private val handler = Handler(Looper.getMainLooper())
     private var activeMode = Mode.NONE
+    private var isListening = false
 
     // Calibration & orientation state (persistent gravity vector)
     private var hasReference = false
@@ -40,13 +41,15 @@ class SmartCarMotionController(
     private var curGx = 0f
     private var curGy = 0f
 
-    // Low-pass filter to eliminate hand tremors
+    // Low-pass filter to isolate gravity from hand tremors on accelerometer fallback
+    private var hasFilteredGravity = false
     private val estGravity = floatArrayOf(0f, 0f, 9.81f)
 
     // Normalized [-1f..1f] steering coordinates
     private var normX = 0f
     private var normY = 0f
     private var isDriving = false
+    private var lastCmd = "%S"
 
     private val streamRunnable = object : Runnable {
         override fun run() {
@@ -56,17 +59,42 @@ class SmartCarMotionController(
         }
     }
 
-    /** Call on button PRESS (ACTION_DOWN). Calibrates current physical angle as resting zero. */
+    /** Start listening to sensors when entering the motion screen so calibration has zero cold-start delay */
+    fun startListening() {
+        if (isListening) return
+        isListening = true
+        hasFilteredGravity = false
+        val sensor = gravitySensor ?: rawAccelSensor
+        sensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+    }
+
+    /** Unregister sensor listener when exiting motion screen */
+    fun stopListening() {
+        stopHold(sendStop = true)
+        if (!isListening) return
+        isListening = false
+        sensorManager.unregisterListener(this)
+    }
+
+    /** Call on button PRESS (ACTION_DOWN). Calibrates current physical angle as resting zero (super position). */
     fun startHold(mode: Mode = Mode.AIR_MOVE) {
         stopHold(sendStop = false)
         activeMode = mode
-        hasReference = false
         isDriving = false
         normX = 0f
         normY = 0f
 
-        val sensor = gravitySensor ?: rawAccelSensor
-        sensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        // Ensure sensors are actively listening
+        startListening()
+
+        // Calibrate instant super position from current physical angle
+        if (curGx != 0f || curGy != 0f) {
+            refGx = curGx
+            refGy = curGy
+            hasReference = true
+        } else {
+            hasReference = false
+        }
 
         sendBluetooth("%S")
         onDotUpdated?.invoke(0f, 0f, "%S")
@@ -77,8 +105,9 @@ class SmartCarMotionController(
     fun stopHold(sendStop: Boolean = true) {
         activeMode = Mode.NONE
         isDriving = false
+        hasReference = false
+        lastCmd = "%S"
         handler.removeCallbacks(streamRunnable)
-        sensorManager.unregisterListener(this)
         normX = 0f
         normY = 0f
         if (sendStop) {
@@ -88,7 +117,6 @@ class SmartCarMotionController(
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (activeMode == Mode.NONE) return
         handleMotionSensor(event)
     }
 
@@ -124,10 +152,16 @@ class SmartCarMotionController(
             rx = event.values[0]
             ry = event.values[1]
         } else if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            // Low-pass filter isolates persistent gravity from hand tremors
-            val alpha = 0.82f
-            estGravity[0] = alpha * estGravity[0] + (1f - alpha) * event.values[0]
-            estGravity[1] = alpha * estGravity[1] + (1f - alpha) * event.values[1]
+            if (!hasFilteredGravity) {
+                estGravity[0] = event.values[0]
+                estGravity[1] = event.values[1]
+                estGravity[2] = event.values[2]
+                hasFilteredGravity = true
+            } else {
+                val alpha = 0.85f
+                estGravity[0] = alpha * estGravity[0] + (1f - alpha) * event.values[0]
+                estGravity[1] = alpha * estGravity[1] + (1f - alpha) * event.values[1]
+            }
             rx = estGravity[0]
             ry = estGravity[1]
         }
@@ -136,18 +170,27 @@ class SmartCarMotionController(
         curGx = sx
         curGy = sy
 
+        if (activeMode == Mode.NONE) return
+
         if (!hasReference) {
             refGx = curGx
             refGy = curGy
             hasReference = true
+            normX = 0f
+            normY = 0f
+            onDotUpdated?.invoke(0f, 0f, lastCmd)
+            return
         }
 
-        // Persistent orientation: holding the phone tilted in the air NEVER depletes
+        // Persistent orientation: holding the phone tilted in the air relative to super position
         val dx = curGx - refGx
         val dy = curGy - refGy
         val maxTilt = 4.8f // ~28 degrees = 100% full tilt
         normX = (dx / maxTilt).coerceIn(-1f, 1f)
         normY = (dy / maxTilt).coerceIn(-1f, 1f)
+
+        // Real-time visual feedback for the joystick knob on sensor update
+        onDotUpdated?.invoke(normX, normY, lastCmd)
     }
 
     private fun computeAndSend() {
@@ -158,6 +201,7 @@ class SmartCarMotionController(
         if (mag < deadzone) {
             if (isDriving) {
                 isDriving = false
+                lastCmd = "%S"
                 sendBluetooth("%S")
                 onDotUpdated?.invoke(0f, 0f, "%S")
             }
@@ -182,6 +226,7 @@ class SmartCarMotionController(
         val pct = (minSpeed + expCurve * (userMax - minSpeed)).roundToInt().coerceIn(minSpeed, userMax)
 
         val cmd = "@$deg,$pct#"
+        lastCmd = cmd
         sendBluetooth(cmd)
         onDotUpdated?.invoke(normX, normY, cmd)
     }

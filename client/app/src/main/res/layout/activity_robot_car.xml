@@ -631,57 +631,116 @@
             android:text="AIR MOVE"
             android:fontFamily="sans-serif-black"
             android:textColor="#FFFFFF"
-            android:textSize="22sp"
+            android:textSize="20sp"
             android:letterSpacing="0.08"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="2dp" />
 
         <TextView
             android:id="@+id/tvMotionInstruction"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Hold the center button and move your phone to drive"
+            android:text="Hold button to calibrate &amp; tilt phone to drive"
             android:fontFamily="sans-serif"
             android:textColor="#8B949E"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:gravity="center"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="8dp" />
 
-        <!-- Center Area: Big Circle Button -->
-        <FrameLayout
+        <!-- Joystick Radar Visualizer (Above) -->
+        <LinearLayout
+            android:id="@+id/layoutJoystickRadar"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▲ FORWARD (90°)"
+                android:fontFamily="monospace"
+                android:textColor="#45A29E"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="2dp" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <Button
-                    android:id="@+id/btnHoldToDrive"
-                    android:layout_width="190dp"
-                    android:layout_height="190dp"
-                    android:text="HOLD\nTO MOVE"
-                    android:textSize="18sp"
-                    android:fontFamily="sans-serif-black"
-                    android:letterSpacing="0.06"
-                    android:textColor="#FFFFFF"
-                    android:gravity="center"
-                    android:background="@drawable/btn_circle_hold" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Press &amp; hold to move • Release to brake"
-                    android:fontFamily="sans-serif"
-                    android:textColor="#66FCF1"
-                    android:textSize="11sp"
-                    android:layout_marginTop="16dp" />
+                    android:text="◄ LEFT\n(180°)"
+                    android:fontFamily="monospace"
+                    android:textColor="#45A29E"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:layout_marginEnd="6dp" />
+
+                <com.nativegamepad.VirtualJoystickView
+                    android:id="@+id/motionJoystickRadar"
+                    android:layout_width="160dp"
+                    android:layout_height="160dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="RIGHT ►\n(0°)"
+                    android:fontFamily="monospace"
+                    android:textColor="#45A29E"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:layout_marginStart="6dp" />
             </LinearLayout>
-        </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▼ REVERSE (-90°)"
+                android:fontFamily="monospace"
+                android:textColor="#45A29E"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <!-- Hold Button Area (Moved below joystick) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btnHoldToDrive"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
+                android:text="HOLD\nTO MOVE"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-black"
+                android:letterSpacing="0.06"
+                android:textColor="#FFFFFF"
+                android:gravity="center"
+                android:background="@drawable/btn_circle_hold" />
+
+            <TextView
+                android:id="@+id/tvSuperPositionStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Calibrates zero position on every hold"
+                android:fontFamily="sans-serif"
+                android:textColor="#66FCF1"
+                android:textSize="11sp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
 
         <!-- Telemetry & Speed Setting Card (Bottom) -->
         <LinearLayout

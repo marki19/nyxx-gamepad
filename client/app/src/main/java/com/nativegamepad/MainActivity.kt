@@ -893,10 +893,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val btnMotionBack = findViewById<Button>(R.id.btnMotionBack)
         val viewMotionStatusDot = findViewById<View>(R.id.viewMotionStatusDot)
         val tvMotionStatus = findViewById<TextView>(R.id.tvMotionStatus)
+        val motionJoystickRadar = findViewById<VirtualJoystickView>(R.id.motionJoystickRadar)
+        val tvSuperPositionStatus = findViewById<TextView>(R.id.tvSuperPositionStatus)
         val tvMotionTelemetry = findViewById<TextView>(R.id.tvMotionTelemetry)
         val tvMotionPacket = findViewById<TextView>(R.id.tvMotionPacket)
         val tvMotionSpeedLabel = findViewById<TextView>(R.id.tvMotionSpeedLabel)
         val sliderMotionSpeed = findViewById<Slider>(R.id.sliderMotionSpeed)
+
+        motionJoystickRadar?.setOnTouchListener { _, _ -> true }
 
         var isMotionScreenOpen = false
 
@@ -904,7 +908,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             if (!isMotionScreenOpen) return
             isMotionScreenOpen = false
             onBackPressCustomAction = null
-            smartCarMotionController?.stopHold()
+            smartCarMotionController?.stopListening()
+            motionJoystickRadar?.resetKnobPosition()
             arduinoSender?.stop()
             val currentSpeed = sliderSpeed.value.toInt()
             arduinoSender?.sendCommand("%V$currentSpeed#")
@@ -925,6 +930,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             val currentSpd = sliderSpeed.value
             sliderMotionSpeed?.value = currentSpd
             tvMotionSpeedLabel?.text = "Cruise Speed: ${currentSpd.toInt()}%"
+            motionJoystickRadar?.resetKnobPosition()
+            tvSuperPositionStatus?.text = "Calibrates zero position on every hold"
+            tvSuperPositionStatus?.setTextColor(Color.parseColor("#66FCF1"))
+            smartCarMotionController?.startListening()
 
             layoutLandscapeDashboard?.visibility = View.GONE
             findViewById<View>(R.id.topBar)?.visibility = View.GONE
@@ -960,12 +969,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 MotionEvent.ACTION_DOWN -> {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     v.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#45A29E"))
+                    tvSuperPositionStatus?.text = "Super position set • Tilt to drive"
+                    tvSuperPositionStatus?.setTextColor(Color.parseColor("#66FCF1"))
                     smartCarMotionController?.startHold(SmartCarMotionController.Mode.AIR_MOVE)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.backgroundTintList = null
                     smartCarMotionController?.stopHold()
+                    motionJoystickRadar?.resetKnobPosition()
+                    tvSuperPositionStatus?.text = "Calibrates zero position on every hold"
+                    tvSuperPositionStatus?.setTextColor(Color.parseColor("#8B949E"))
                     tvMotionTelemetry?.text = "Direction: Center (Brake)"
                     tvMotionPacket?.text = "Packet: %S"
                     val currentSpeed = sliderSpeed.value.toInt()
@@ -989,6 +1003,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             onDotUpdated = { normX, normY, cmd ->
                 runOnUiThread {
                     virtualJoystick?.setExternalKnobPosition(normX, normY)
+                    motionJoystickRadar?.setExternalKnobPosition(normX, normY)
                     tvJoystickAngle?.text = if (cmd == "%S") "Motion: Center" else "Motion: $cmd"
 
                     if (cmd == "%S") {
@@ -1639,7 +1654,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             btStateReceiver?.let { unregisterReceiver(it) }
         } catch (_: Exception) {}
         discoveryJob?.cancel()
-        smartCarMotionController?.stopHold()
+        smartCarMotionController?.stopListening()
         sensorManager?.unregisterListener(this)
         udpSender?.stop()
         bluetoothSender?.destroy()
@@ -1673,7 +1688,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onPause() {
         super.onPause()
-        smartCarMotionController?.stopHold()
+        smartCarMotionController?.stopListening()
         sensorManager?.unregisterListener(this)
         arduinoSender?.sendCommand("%Q")
         
