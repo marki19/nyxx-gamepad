@@ -118,6 +118,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var smartCarMotionController: SmartCarMotionController? = null
     private var gamepadView: GamepadView? = null
     private var drawerLayout: DrawerLayout? = null
+    private var onBackPressCustomAction: (() -> Boolean)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -134,6 +135,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (onBackPressCustomAction?.invoke() == true) {
+                    return
+                }
                 val isInEditMode = gamepadView?.isEditMode == true
                 if (isInEditMode) {
                     // Let saveEditMode() -> onEditModeExited handle all dismissal animations
@@ -544,6 +548,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         val btnTiltSteer = findViewById<Button>(R.id.btnTiltSteer)
         val btnAirMove = findViewById<Button>(R.id.btnAirMove)
+        val btnHoldToDrive = findViewById<Button>(R.id.btnHoldToDrive)
 
         fun setControlsEnabled(enabled: Boolean) {
             modeButtons.forEach { it.isEnabled = enabled; it.alpha = if (enabled) 1.0f else 0.5f }
@@ -562,6 +567,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             btnTiltSteer?.alpha = if (enabled) 1.0f else 0.85f
             btnAirMove?.isEnabled = true
             btnAirMove?.alpha = if (enabled) 1.0f else 0.85f
+            btnHoldToDrive?.isEnabled = enabled
+            btnHoldToDrive?.alpha = if (enabled) 1.0f else 0.5f
         }
         setControlsEnabled(false)
 
@@ -883,7 +890,142 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             stopAllModesAndMotion()
         }
 
-        // Motion Controls (Tilt Steer & Air Move)
+        // Portrait Motion Screen views
+        val layoutLandscapeDashboard = findViewById<LinearLayout>(R.id.layoutLandscapeDashboard)
+        val layoutPortraitMotion = findViewById<LinearLayout>(R.id.layoutPortraitMotion)
+        val btnMotionBack = findViewById<Button>(R.id.btnMotionBack)
+        val viewMotionStatusDot = findViewById<View>(R.id.viewMotionStatusDot)
+        val tvMotionStatus = findViewById<TextView>(R.id.tvMotionStatus)
+        val btnTabTiltSteer = findViewById<Button>(R.id.btnTabTiltSteer)
+        val btnTabAirMove = findViewById<Button>(R.id.btnTabAirMove)
+        val tvMotionInstruction = findViewById<TextView>(R.id.tvMotionInstruction)
+        val motionJoystickRadar = findViewById<VirtualJoystickView>(R.id.motionJoystickRadar)
+        val tvMotionTelemetry = findViewById<TextView>(R.id.tvMotionTelemetry)
+        val tvMotionPacket = findViewById<TextView>(R.id.tvMotionPacket)
+        val tvMotionSpeedLabel = findViewById<TextView>(R.id.tvMotionSpeedLabel)
+        val sliderMotionSpeed = findViewById<Slider>(R.id.sliderMotionSpeed)
+
+        motionJoystickRadar?.setOnTouchListener { _, _ -> true }
+
+        var currentMotionMode = SmartCarMotionController.Mode.TILT_STEER
+        var isMotionScreenOpen = false
+
+        fun updateMotionTabUI(mode: SmartCarMotionController.Mode) {
+            currentMotionMode = mode
+            if (mode == SmartCarMotionController.Mode.TILT_STEER) {
+                btnTabTiltSteer?.isSelected = true
+                btnTabTiltSteer?.setTextColor(Color.parseColor("#FFFFFF"))
+                btnTabAirMove?.isSelected = false
+                btnTabAirMove?.setTextColor(Color.parseColor("#8B949E"))
+                tvMotionInstruction?.text = "Hold button & tilt phone like a steering wheel"
+                btnHoldToDrive?.text = "HOLD TO STEER"
+            } else {
+                btnTabTiltSteer?.isSelected = false
+                btnTabTiltSteer?.setTextColor(Color.parseColor("#8B949E"))
+                btnTabAirMove?.isSelected = true
+                btnTabAirMove?.setTextColor(Color.parseColor("#FFFFFF"))
+                tvMotionInstruction?.text = "Hold button & move phone in the air"
+                btnHoldToDrive?.text = "HOLD TO AIR MOVE"
+            }
+        }
+
+        fun closeMotionScreen() {
+            if (!isMotionScreenOpen) return
+            isMotionScreenOpen = false
+            onBackPressCustomAction = null
+            smartCarMotionController?.stopHold()
+            motionJoystickRadar?.resetKnobPosition()
+            arduinoSender?.stop()
+            val currentSpeed = sliderSpeed.value.toInt()
+            arduinoSender?.sendCommand("%V$currentSpeed#")
+
+            layoutPortraitMotion?.visibility = View.GONE
+            findViewById<View>(R.id.topBar)?.visibility = View.VISIBLE
+            layoutLandscapeDashboard?.visibility = View.VISIBLE
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+
+        fun openMotionScreen(mode: SmartCarMotionController.Mode) {
+            stopAllModesAndMotion()
+            isMotionScreenOpen = true
+            onBackPressCustomAction = {
+                closeMotionScreen()
+                true
+            }
+            updateMotionTabUI(mode)
+            val currentSpd = sliderSpeed.value
+            sliderMotionSpeed?.value = currentSpd
+            tvMotionSpeedLabel?.text = "Cruise Speed: ${currentSpd.toInt()}%"
+
+            layoutLandscapeDashboard?.visibility = View.GONE
+            findViewById<View>(R.id.topBar)?.visibility = View.GONE
+            layoutPortraitMotion?.visibility = View.VISIBLE
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+
+        btnTiltSteer?.applyInteractivePress {
+            openMotionScreen(SmartCarMotionController.Mode.TILT_STEER)
+        }
+        btnAirMove?.applyInteractivePress {
+            openMotionScreen(SmartCarMotionController.Mode.AIR_MOVE)
+        }
+        btnMotionBack?.applyInteractivePress {
+            closeMotionScreen()
+        }
+        btnTabTiltSteer?.applyInteractivePress {
+            if (currentMotionMode != SmartCarMotionController.Mode.TILT_STEER) {
+                smartCarMotionController?.stopHold()
+                motionJoystickRadar?.resetKnobPosition()
+                updateMotionTabUI(SmartCarMotionController.Mode.TILT_STEER)
+            }
+        }
+        btnTabAirMove?.applyInteractivePress {
+            if (currentMotionMode != SmartCarMotionController.Mode.AIR_MOVE) {
+                smartCarMotionController?.stopHold()
+                motionJoystickRadar?.resetKnobPosition()
+                updateMotionTabUI(SmartCarMotionController.Mode.AIR_MOVE)
+            }
+        }
+
+        sliderMotionSpeed?.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) {
+                val spd = value.toInt()
+                tvMotionSpeedLabel?.text = "Cruise Speed: $spd%"
+                sliderSpeed.value = value
+                tvSpeedValue.text = "$spd %"
+                getSharedPreferences("robot_car_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt("cruise_speed", spd)
+                    .apply()
+                if (arduinoSender?.isConnected == true) {
+                    arduinoSender?.sendCommand("%V$spd#")
+                }
+            }
+        }
+
+        btnHoldToDrive?.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    v.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#45A29E"))
+                    smartCarMotionController?.startHold(currentMotionMode)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.backgroundTintList = null
+                    smartCarMotionController?.stopHold()
+                    motionJoystickRadar?.resetKnobPosition()
+                    tvMotionTelemetry?.text = "Direction: Center (Brake)"
+                    tvMotionPacket?.text = "Packet: %S"
+                    val currentSpeed = sliderSpeed.value.toInt()
+                    arduinoSender?.sendCommand("%V$currentSpeed#")
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Motion Controls (Tilt Steer & Air Move Engine)
         smartCarMotionController = SmartCarMotionController(
             context = this,
             sendBluetooth = { cmd ->
@@ -896,39 +1038,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             onDotUpdated = { normX, normY, cmd ->
                 runOnUiThread {
                     virtualJoystick?.setExternalKnobPosition(normX, normY)
+                    motionJoystickRadar?.setExternalKnobPosition(normX, normY)
                     tvJoystickAngle?.text = if (cmd == "%S") "Motion: Center" else "Motion: $cmd"
+
+                    if (cmd == "%S") {
+                        tvMotionTelemetry?.text = "Direction: Center (Brake)"
+                        tvMotionPacket?.text = "Packet: %S"
+                    } else {
+                        val deg = cmd.substringAfter("@").substringBefore(",")
+                        val pct = cmd.substringAfter(",").substringBefore("#")
+                        val dirLabel = when (deg.toIntOrNull()) {
+                            in 68..112 -> "FORWARD ($deg°)"
+                            in -112..-68 -> "REVERSE ($deg°)"
+                            in -22..22 -> "SPIN RIGHT ($deg°)"
+                            in 158..180, in -180..-158 -> "SPIN LEFT ($deg°)"
+                            in 23..67 -> "CURVE FWD-RIGHT ($deg°)"
+                            in 113..157 -> "CURVE FWD-LEFT ($deg°)"
+                            in -67..-23 -> "CURVE REV-RIGHT ($deg°)"
+                            in -157..-113 -> "CURVE REV-LEFT ($deg°)"
+                            else -> "$deg°"
+                        }
+                        tvMotionTelemetry?.text = "Heading: $dirLabel  Speed: $pct%"
+                        tvMotionPacket?.text = "Packet: $cmd"
+                    }
                 }
             }
         )
-
-        fun setupMotionButton(button: Button?, mode: SmartCarMotionController.Mode) {
-            button?.setOnTouchListener { v, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        v.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#45A29E"))
-                        if (activeRobotModeCmd != null) {
-                            toggleMode(activeRobotModeCmd!!)
-                        }
-                        smartCarMotionController?.startHold(mode)
-                        true
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.backgroundTintList = null
-                        smartCarMotionController?.stopHold()
-                        virtualJoystick?.resetKnobPosition()
-                        tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Touch to steer"
-                        val currentSpeed = sliderSpeed.value.toInt()
-                        arduinoSender?.sendCommand("%V$currentSpeed#")
-                        true
-                    }
-                    else -> false
-                }
-            }
-        }
-
-        setupMotionButton(btnTiltSteer, SmartCarMotionController.Mode.TILT_STEER)
-        setupMotionButton(btnAirMove, SmartCarMotionController.Mode.AIR_MOVE)
 
         // Observe ConnectionState
         val sender = arduinoSender ?: return
@@ -939,6 +1074,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         tvStatus.text = "Disconnected"
                         tvStatus.setTextColor(Color.parseColor("#FF5C5C"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FF5C5C"))
+                        tvMotionStatus?.text = "Disconnected"
+                        tvMotionStatus?.setTextColor(Color.parseColor("#FF5C5C"))
+                        viewMotionStatusDot?.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FF5C5C"))
                         setControlsEnabled(false)
                         activeRobotModeCmd = null
                         updateModeSelectionUI(null)
@@ -947,18 +1085,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         tvStatus.text = "Scanning..."
                         tvStatus.setTextColor(Color.parseColor("#FFA500"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
+                        tvMotionStatus?.text = "Scanning..."
+                        tvMotionStatus?.setTextColor(Color.parseColor("#FFA500"))
+                        viewMotionStatusDot?.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
                         setControlsEnabled(false)
                     }
                     BleConnectionState.Connecting -> {
                         tvStatus.text = "Connecting..."
                         tvStatus.setTextColor(Color.parseColor("#FFA500"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
+                        tvMotionStatus?.text = "Connecting..."
+                        tvMotionStatus?.setTextColor(Color.parseColor("#FFA500"))
+                        viewMotionStatusDot?.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
                         setControlsEnabled(false)
                     }
                     BleConnectionState.Reconnecting -> {
                         tvStatus.text = "Reconnecting..."
                         tvStatus.setTextColor(Color.parseColor("#FFA500"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
+                        tvMotionStatus?.text = "Reconnecting..."
+                        tvMotionStatus?.setTextColor(Color.parseColor("#FFA500"))
+                        viewMotionStatusDot?.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFA500"))
                         setControlsEnabled(false)
                     }
                     BleConnectionState.Connected -> {
@@ -966,6 +1113,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         tvStatus.text = "Connected ($carName)"
                         tvStatus.setTextColor(Color.parseColor("#66FCF1"))
                         viewDot.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#66FCF1"))
+                        tvMotionStatus?.text = "Connected ($carName)"
+                        tvMotionStatus?.setTextColor(Color.parseColor("#66FCF1"))
+                        viewMotionStatusDot?.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#66FCF1"))
 
                         setControlsEnabled(true)
                         lifecycleScope.launch {

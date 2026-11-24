@@ -112,22 +112,34 @@ class SmartCarMotionController(
     private fun getDisplayRotation(): Int {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                context.display?.rotation ?: Surface.ROTATION_90
+                context.display?.rotation ?: Surface.ROTATION_0
             } catch (e: Exception) {
-                Surface.ROTATION_90
+                Surface.ROTATION_0
             }
         } else {
             @Suppress("DEPRECATION")
             (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay?.rotation
-                ?: Surface.ROTATION_90
+                ?: Surface.ROTATION_0
         }
     }
 
-    private fun mapToScreenAxes(rawX: Float, rawY: Float): Pair<Float, Float> {
+    private fun mapTiltAxes(rawX: Float, rawY: Float): Pair<Float, Float> {
         return when (getDisplayRotation()) {
             Surface.ROTATION_90 -> Pair(-rawY, rawX)
             Surface.ROTATION_270 -> Pair(rawY, -rawX)
             Surface.ROTATION_180 -> Pair(-rawX, -rawY)
+            // In portrait (ROTATION_0): right roll is +X, forward pitch dips top edge down (reducing rawY),
+            // so inverting rawY produces positive delta (forward driving)
+            else -> Pair(rawX, -rawY)
+        }
+    }
+
+    private fun mapAirMoveAxes(rawX: Float, rawY: Float): Pair<Float, Float> {
+        return when (getDisplayRotation()) {
+            Surface.ROTATION_90 -> Pair(-rawY, rawX)
+            Surface.ROTATION_270 -> Pair(rawY, -rawX)
+            Surface.ROTATION_180 -> Pair(-rawX, -rawY)
+            // In portrait (ROTATION_0): moving phone to the right is +X, moving phone forward along body is +Y
             else -> Pair(rawX, rawY)
         }
     }
@@ -147,7 +159,7 @@ class SmartCarMotionController(
             ry = estGravity[1]
         }
 
-        val (sx, sy) = mapToScreenAxes(rx, ry)
+        val (sx, sy) = mapTiltAxes(rx, ry)
         curGx = sx
         curGy = sy
 
@@ -193,7 +205,7 @@ class SmartCarMotionController(
             ry = event.values[1] - estGravity[1]
         }
 
-        val (rawAx, rawAy) = mapToScreenAxes(rx, ry)
+        val (rawAx, rawAy) = mapAirMoveAxes(rx, ry)
         var ax = rawAx
         var ay = rawAy
 
