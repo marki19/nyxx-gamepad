@@ -169,6 +169,44 @@ class ArduinoBluetoothManager(
         // Clean up previous gatt if any
         closeGatt()
 
+        // 1. Check if car is already paired or connected at system level (e.g. in phone Bluetooth settings)
+        val bluetoothManager = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val systemConnected = try {
+            bluetoothManager?.getConnectedDevices(BluetoothProfile.GATT) ?: emptyList()
+        } catch (_: Exception) { emptyList() }
+
+        val bonded = try {
+            adapter.bondedDevices ?: emptySet()
+        } catch (_: Exception) { emptySet() }
+
+        val candidates = (systemConnected + bonded).distinctBy { it.address }
+        val alreadyPairedCar = candidates.firstOrNull { dev ->
+            val name = dev.name ?: ""
+            val address = dev.address
+            (!targetDeviceAddress.isNullOrBlank() && address.equals(targetDeviceAddress, ignoreCase = true)) ||
+            name.equals("mark1e3", ignoreCase = true) ||
+            name.contains("mark", ignoreCase = true) ||
+            name.contains("JDY", ignoreCase = true) ||
+            name.contains("car", ignoreCase = true) ||
+            name.contains("robot", ignoreCase = true)
+        }
+
+        if (alreadyPairedCar != null) {
+            Log.i(TAG, "Car found in bonded/system devices: ${alreadyPairedCar.name} [${alreadyPairedCar.address}]. Connecting direct GATT...")
+            connectedDeviceName = alreadyPairedCar.name ?: "Robot Car"
+            connectDeferred = CompletableDeferred()
+            connectGattInternal(alreadyPairedCar)
+            val directResult = withTimeoutOrNull(15000L) {
+                connectDeferred?.await()
+            } ?: false
+
+            if (directResult) {
+                return@withContext true
+            } else {
+                Log.w(TAG, "Direct GATT connection to bonded device failed/timed out. Falling back to BLE scan.")
+            }
+        }
+
         _connectionState.value = BleConnectionState.Scanning
 
         connectDeferred = CompletableDeferred()

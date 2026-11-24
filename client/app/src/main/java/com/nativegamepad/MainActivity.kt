@@ -908,15 +908,32 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     @android.annotation.SuppressLint("MissingPermission")
     private fun showBleDevicePicker() {
-        val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = manager?.adapter
         val scanner = adapter?.bluetoothLeScanner
-        if (adapter == null || !adapter.isEnabled || scanner == null) {
+        if (adapter == null || !adapter.isEnabled) {
             Toast.makeText(this, "Bluetooth must be enabled to scan", Toast.LENGTH_SHORT).show()
             return
         }
 
         val discoveredDevices = mutableListOf<BluetoothDevice>()
         val deviceLabels = mutableListOf<String>()
+
+        // 1. Immediately list any paired or currently system-connected devices!
+        val systemConnected = try {
+            manager.getConnectedDevices(android.bluetooth.BluetoothProfile.GATT) ?: emptyList()
+        } catch (_: Exception) { emptyList() }
+
+        val bonded = try {
+            adapter.bondedDevices ?: emptySet()
+        } catch (_: Exception) { emptySet() }
+
+        val preExisting = (systemConnected + bonded).distinctBy { it.address }
+        for (dev in preExisting) {
+            discoveredDevices.add(dev)
+            val name = dev.name ?: "Unknown Device"
+            deviceLabels.add("★ $name (Paired/Connected)\n${dev.address}")
+        }
 
         val arrayAdapter = android.widget.ArrayAdapter(
             this,
@@ -945,38 +962,43 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             .setNegativeButton("Cancel", null)
             .setOnDismissListener {
                 try {
-                    scanCallback?.let { scanner.stopScan(it) }
+                    scanCallback?.let { scanner?.stopScan(it) }
                 } catch (_: Exception) {}
             }
             .create()
 
-        scanCallback = object : ScanCallback() {
-            override fun onScanResult(callbackType: Int, result: ScanResult?) {
-                val device = result?.device ?: return
-                val name = result.scanRecord?.deviceName ?: device.name ?: ""
-                val address = device.address
+        if (scanner != null) {
+            scanCallback = object : ScanCallback() {
+                override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                    val device = result?.device ?: return
+                    val name = result.scanRecord?.deviceName ?: device.name ?: ""
+                    val address = device.address
 
-                if (discoveredDevices.none { it.address.equals(address, ignoreCase = true) }) {
-                    discoveredDevices.add(device)
-                    val displayName = if (name.isNotBlank()) name else "Unknown Device"
-                    val label = "$displayName\n$address  (${result.rssi} dBm)"
-                    deviceLabels.add(label)
-                    runOnUiThread { arrayAdapter.notifyDataSetChanged() }
+                    if (discoveredDevices.none { it.address.equals(address, ignoreCase = true) }) {
+                        discoveredDevices.add(device)
+                        val displayName = if (name.isNotBlank()) name else "Unknown Device"
+                        val label = "$displayName\n$address  (${result.rssi} dBm)"
+                        deviceLabels.add(label)
+                        runOnUiThread { arrayAdapter.notifyDataSetChanged() }
+                    }
                 }
             }
+
+            val scanSettings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
+
+            try {
+                scanner.startScan(null, scanSettings, scanCallback)
+            } catch (_: Exception) {}
         }
 
-        val scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
-
-        scanner.startScan(null, scanSettings, scanCallback)
         dialog.show()
 
         lifecycleScope.launch {
             delay(12000L)
             try {
-                scanCallback?.let { scanner.stopScan(it) }
+                scanCallback?.let { scanner?.stopScan(it) }
             } catch (_: Exception) {}
         }
     }
