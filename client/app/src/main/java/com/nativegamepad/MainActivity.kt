@@ -5,6 +5,8 @@ import android.content.pm.ActivityInfo
 import androidx.activity.OnBackPressedCallback
 import android.os.Bundle
 import android.os.BatteryManager
+import android.os.Handler
+import android.os.Looper
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -865,31 +867,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        fun stopAllModesAndMotion() {
-            smartCarMotionController?.stopHold()
-            steeringWheel?.resetToCenter()
-            robotModeJob?.cancel()
-            activeRobotModeCmd = null
-            arduinoSender?.stop()
-            arduinoSender?.sendCommand("%Q")
-            updateModeSelectionUI(null)
-        }
-
-        btnAvoid.applyInteractivePress { toggleMode("%A#") }
-        btnFollow.applyInteractivePress { toggleMode("%F#") }
-        btnLine.applyInteractivePress { toggleMode("%T#") }
-        btnLight.applyInteractivePress { toggleMode("%P#") }
-
-        btnStop.applyInteractivePress {
-            stopAllModesAndMotion()
-        }
-
         // Interactive Steering Wheel & Pedal Drive Engine
         var isGasPressed = false
         var isBrakePressed = false
         var currentSteerAngle = 0f
 
-        fun updatePedalDrive() {
+        fun sendPedalDrivePacket() {
             if (activeRobotModeCmd != null) return
 
             if (isGasPressed && !isBrakePressed) {
@@ -914,8 +897,57 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
                 tvJoystickAngle?.text = "REV: $steerLabel ($driveAngle°)"
                 tvJoystickAngle?.setTextColor(Color.parseColor("#FF5C5C"))
+            }
+        }
+
+        val pedalStreamHandler = Handler(Looper.getMainLooper())
+        val pedalStreamRunnable = object : Runnable {
+            override fun run() {
+                if (!isGasPressed && !isBrakePressed) return
+                sendPedalDrivePacket()
+                pedalStreamHandler.postDelayed(this, 75L) // Stream at ~13 Hz for continuous hold-to-drive
+            }
+        }
+
+        fun stopPedalDrive() {
+            pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+            arduinoSender?.stop()
+            val steerLabel = when {
+                currentSteerAngle < -6f -> "◄ LEFT ${abs(currentSteerAngle).roundToInt()}°"
+                currentSteerAngle > 6f -> "RIGHT ${currentSteerAngle.roundToInt()}° ►"
+                else -> "Center (0°)"
+            }
+            tvJoystickAngle?.text = if (activeRobotModeCmd != null) "Auto Active" else "Wheel: $steerLabel"
+            tvJoystickAngle?.setTextColor(Color.parseColor("#8B949E"))
+        }
+
+        fun stopAllModesAndMotion() {
+            smartCarMotionController?.stopHold()
+            steeringWheel?.resetToCenter()
+            stopPedalDrive()
+            isGasPressed = false
+            isBrakePressed = false
+            robotModeJob?.cancel()
+            activeRobotModeCmd = null
+            arduinoSender?.stop()
+            arduinoSender?.sendCommand("%Q")
+            updateModeSelectionUI(null)
+        }
+
+        btnAvoid.applyInteractivePress { toggleMode("%A#") }
+        btnFollow.applyInteractivePress { toggleMode("%F#") }
+        btnLine.applyInteractivePress { toggleMode("%T#") }
+        btnLight.applyInteractivePress { toggleMode("%P#") }
+
+        btnStop.applyInteractivePress {
+            stopAllModesAndMotion()
+        }
+
+        steeringWheel?.onAngleChanged = { angle ->
+            currentSteerAngle = angle
+            if (isGasPressed || isBrakePressed) {
+                sendPedalDrivePacket()
             } else {
-                arduinoSender?.stop()
                 val steerLabel = when {
                     currentSteerAngle < -6f -> "◄ LEFT ${abs(currentSteerAngle).roundToInt()}°"
                     currentSteerAngle > 6f -> "RIGHT ${currentSteerAngle.roundToInt()}° ►"
@@ -926,14 +958,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        steeringWheel?.onAngleChanged = { angle ->
-            currentSteerAngle = angle
-            updatePedalDrive()
-        }
-
         steeringWheel?.onReleased = {
             currentSteerAngle = 0f
-            updatePedalDrive()
+            if (isGasPressed || isBrakePressed) {
+                sendPedalDrivePacket()
+            } else {
+                stopPedalDrive()
+            }
         }
 
         btnPedalGas?.setOnTouchListener { v, event ->
@@ -941,12 +972,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 MotionEvent.ACTION_DOWN -> {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     isGasPressed = true
-                    updatePedalDrive()
+                    isBrakePressed = false
+                    pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+                    sendPedalDrivePacket()
+                    pedalStreamHandler.postDelayed(pedalStreamRunnable, 75L)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     isGasPressed = false
-                    updatePedalDrive()
+                    if (isBrakePressed) {
+                        sendPedalDrivePacket()
+                    } else {
+                        stopPedalDrive()
+                    }
                     true
                 }
                 else -> false
@@ -958,12 +996,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 MotionEvent.ACTION_DOWN -> {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     isBrakePressed = true
-                    updatePedalDrive()
+                    isGasPressed = false
+                    pedalStreamHandler.removeCallbacks(pedalStreamRunnable)
+                    sendPedalDrivePacket()
+                    pedalStreamHandler.postDelayed(pedalStreamRunnable, 75L)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     isBrakePressed = false
-                    updatePedalDrive()
+                    if (isGasPressed) {
+                        sendPedalDrivePacket()
+                    } else {
+                        stopPedalDrive()
+                    }
                     true
                 }
                 else -> false

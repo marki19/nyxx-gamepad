@@ -484,7 +484,7 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1.2"
+            android:layout_weight="1.25"
             android:orientation="vertical"
             android:background="@drawable/bg_dark_card"
             android:padding="8dp">
@@ -498,13 +498,12 @@
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="3dp" />
 
-            <!-- 2x2 Grid of 4 Modes -->
+            <!-- Compact 2x2 Grid of 4 Modes (Minimized) -->
             <GridLayout
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
+                android:layout_height="wrap_content"
                 android:columnCount="2"
                 android:rowCount="2"
                 android:alignmentMode="alignMargins"
@@ -514,11 +513,10 @@
                 <Button
                     android:id="@+id/btnModeAvoid"
                     android:layout_width="0dp"
-                    android:layout_height="0dp"
+                    android:layout_height="30dp"
                     android:layout_columnWeight="1"
-                    android:layout_rowWeight="1"
                     android:text="Obstacle Avoid"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="#E6EDF3"
                     android:background="@drawable/btn_interactive_selector"
@@ -527,11 +525,10 @@
                 <Button
                     android:id="@+id/btnModeFollow"
                     android:layout_width="0dp"
-                    android:layout_height="0dp"
+                    android:layout_height="30dp"
                     android:layout_columnWeight="1"
-                    android:layout_rowWeight="1"
                     android:text="Object Follow"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="#E6EDF3"
                     android:background="@drawable/btn_interactive_selector"
@@ -540,11 +537,10 @@
                 <Button
                     android:id="@+id/btnModeLine"
                     android:layout_width="0dp"
-                    android:layout_height="0dp"
+                    android:layout_height="30dp"
                     android:layout_columnWeight="1"
-                    android:layout_rowWeight="1"
                     android:text="Line Tracking"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="#E6EDF3"
                     android:background="@drawable/btn_interactive_selector"
@@ -553,18 +549,17 @@
                 <Button
                     android:id="@+id/btnModeLight"
                     android:layout_width="0dp"
-                    android:layout_height="0dp"
+                    android:layout_height="30dp"
                     android:layout_columnWeight="1"
-                    android:layout_rowWeight="1"
                     android:text="Light Seeking"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="#E6EDF3"
                     android:background="@drawable/btn_interactive_selector"
                     android:layout_margin="2dp" />
             </GridLayout>
 
-            <!-- DRIVE PEDALS (GAS & BRAKE/REV) -->
+            <!-- DRIVE PEDALS (EXPANDED TO FILL SPACE) -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -574,12 +569,13 @@
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:layout_marginBottom="3dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
@@ -590,7 +586,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:text="BRAKE\nREV"
-                    android:textSize="12sp"
+                    android:textSize="14sp"
                     android:fontFamily="sans-serif-black"
                     android:letterSpacing="0.06"
                     android:textColor="#FF5C5C"
@@ -604,7 +600,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1.2"
                     android:text="GAS\nDRIVE"
-                    android:textSize="13sp"
+                    android:textSize="15sp"
                     android:fontFamily="sans-serif-black"
                     android:letterSpacing="0.06"
                     android:textColor="#66FCF1"
