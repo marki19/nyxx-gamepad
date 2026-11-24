@@ -136,12 +136,11 @@ class SmartCarMotionController(
 
     private fun mapTiltAxes(rawX: Float, rawY: Float): Pair<Float, Float> {
         return when (getDisplayRotation()) {
-            Surface.ROTATION_90 -> Pair(-rawY, rawX)
-            Surface.ROTATION_270 -> Pair(rawY, -rawX)
-            Surface.ROTATION_180 -> Pair(-rawX, -rawY)
-            // In portrait (ROTATION_0): right roll is +X, forward pitch dips top edge down (reducing rawY),
-            // inverting rawY produces positive delta (forward driving)
-            else -> Pair(rawX, -rawY)
+            Surface.ROTATION_90 -> Pair(rawY, rawX)
+            Surface.ROTATION_270 -> Pair(-rawY, -rawX)
+            Surface.ROTATION_180 -> Pair(rawX, rawY)
+            // In portrait (ROTATION_0): invert rawX so tilting right is +X and tilting left is -X
+            else -> Pair(-rawX, -rawY)
         }
     }
 
