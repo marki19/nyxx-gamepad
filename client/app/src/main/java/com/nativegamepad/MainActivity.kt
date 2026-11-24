@@ -1013,7 +1013,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     }
                 }
             }
-        )
+        ).apply {
+            maxSpeedProvider = { sliderSpeed.value.toInt() }
+        }
 
         // Observe ConnectionState
         val sender = arduinoSender ?: return
