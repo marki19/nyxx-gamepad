@@ -118,7 +118,16 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
 
         {errorMessage && (
           <div className="bt-notice error">
-            ⚠️ {errorMessage}
+            ⚠️ <strong>{errorMessage}</strong>
+            {errorMessage.toLowerCase().includes('globally disabled') && (
+              <div style={{ marginTop: '8px', fontSize: '11px', lineHeight: '1.4', color: '#EDEEF0' }}>
+                Your browser blocks Web Bluetooth by default.<br />
+                <strong>Fix:</strong><br />
+                • <strong>Google Chrome / Edge</strong>: Open <code>chrome://settings/content/bluetoothDevices</code> and select <em>"Sites can ask to connect"</em>.<br />
+                • <strong>Brave</strong>: Open <code>brave://flags</code>, enable <em>"Use the new permissions backend for Web Bluetooth"</em>, then relaunch.<br />
+                • Or use the <strong>Nyxx Android App</strong> already installed on your phone.
+              </div>
+            )}
           </div>
         )}
 
