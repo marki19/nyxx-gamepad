@@ -647,7 +647,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         btnBack.applyInteractivePress {
-            arduinoSender?.sendCommand("%Q")
+            if (activeRobotModeCmd == null) {
+                arduinoSender?.sendCommand("%Q")
+            }
             arduinoSender?.closeConnection()
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             val intent = Intent(this@MainActivity, HomeActivity::class.java)
@@ -1250,7 +1252,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                             delay(40L)
                             sender.sendCommand("%$curSpd+#")
                             delay(40L)
-                            sender.sendCommand("%G#")
+                            if (activeRobotModeCmd == null) {
+                                sender.sendCommand("%G#")
+                            }
                         }
                     }
                 }
@@ -1809,7 +1813,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager?.unregisterListener(this)
         udpSender?.stop()
         bluetoothSender?.destroy()
-        arduinoSender?.sendCommand("%Q")
+        if (activeRobotModeCmd == null) {
+            arduinoSender?.sendCommand("%Q")
+        }
         arduinoSender?.closeConnection()
     }
 
@@ -1841,7 +1847,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onPause()
         smartCarMotionController?.stopListening()
         sensorManager?.unregisterListener(this)
-        arduinoSender?.sendCommand("%Q")
+        // If an autonomous mode (Line, Avoidance, Follow, Light) is running, let it continue!
+        // Only stop manual drive when app is paused
+        if (activeRobotModeCmd == null) {
+            arduinoSender?.stop()
+        }
         
         // Zero out gyro inputs to prevent stuck steering when suspended
         val state = udpSender?.state ?: bluetoothSender?.state
