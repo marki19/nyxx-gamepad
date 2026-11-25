@@ -1,4 +1,16 @@
 // Web Bluetooth API Type Declarations
+interface BluetoothCharacteristicProperties {
+  broadcast: boolean;
+  read: boolean;
+  writeWithoutResponse: boolean;
+  write: boolean;
+  notify: boolean;
+  indicate: boolean;
+  authenticatedSignedWrites: boolean;
+  reliableWrite: boolean;
+  writableAuxiliaries: boolean;
+}
+
 interface BluetoothDevice extends EventTarget {
   id: string;
   name?: string;
@@ -13,6 +25,7 @@ interface BluetoothRemoteGATTServer {
   connect(): Promise<BluetoothRemoteGATTServer>;
   disconnect(): void;
   getPrimaryService(service: BluetoothServiceUUID): Promise<BluetoothRemoteGATTService>;
+  getPrimaryServices?(service?: BluetoothServiceUUID): Promise<BluetoothRemoteGATTService[]>;
 }
 
 interface BluetoothRemoteGATTService {
@@ -20,11 +33,13 @@ interface BluetoothRemoteGATTService {
   isPrimary: boolean;
   device: BluetoothDevice;
   getCharacteristic(characteristic: BluetoothCharacteristicUUID): Promise<BluetoothRemoteGATTCharacteristic>;
+  getCharacteristics?(characteristic?: BluetoothCharacteristicUUID): Promise<BluetoothRemoteGATTCharacteristic[]>;
 }
 
 interface BluetoothRemoteGATTCharacteristic extends EventTarget {
   service: BluetoothRemoteGATTService;
   uuid: string;
+  properties: BluetoothCharacteristicProperties;
   value?: DataView;
   writeValue(value: BufferSource): Promise<void>;
   writeValueWithResponse?(value: BufferSource): Promise<void>;

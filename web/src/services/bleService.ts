@@ -1,7 +1,16 @@
-// BLE Service for JDY-16 Arduino Robot Car Remote
+// BLE Service for JDY-16 / BT05 Arduino Robot Car Remote
 
-const SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
-const WRITE_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
+const CANDIDATE_SERVICES: BluetoothServiceUUID[] = [
+  '0000ffe0-0000-1000-8000-00805f9b34fb',
+  0xffe0,
+  '0000fff0-0000-1000-8000-00805f9b34fb',
+  0xfff0,
+  '0000dfb0-0000-1000-8000-00805f9b34fb',
+  0xdfb0,
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+];
+
+const STANDARD_WRITE_CHAR = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
 export type ConnectionStatus = 'disconnected' | 'scanning' | 'connecting' | 'connected';
 
@@ -10,7 +19,7 @@ class BleService {
   private txCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
   public status: ConnectionStatus = 'disconnected';
-  public deviceName: string = 'JDY-16';
+  public deviceName: string = 'Robot Car';
 
   private statusListeners: Array<(status: ConnectionStatus, name: string) => void> = [];
 
@@ -43,23 +52,27 @@ class BleService {
     }
 
     if (!navigator.bluetooth) {
-      throw new Error('Web Bluetooth is not supported on this browser. Use Google Chrome or Bluefy.');
+      if (!window.isSecureContext) {
+        throw new Error('Web Bluetooth requires HTTPS or http://localhost. It cannot run over insecure HTTP.');
+      }
+      throw new Error('Web Bluetooth is not supported on this browser. Use Google Chrome, Microsoft Edge, Opera, or Bluefy (iOS).');
     }
 
     try {
       this.setStatus('scanning');
 
-      // Use acceptAllDevices by default so renamed devices (not named JDY-16) are visible,
-      // or filter by the standard BLE UART Service UUID (FFE0).
+      // acceptAllDevices allows finding renamed modules or custom names
       const options: RequestDeviceOptions = showAllDevices
-        ? { acceptAllDevices: true, optionalServices: [SERVICE_UUID] }
+        ? { acceptAllDevices: true, optionalServices: CANDIDATE_SERVICES }
         : {
             filters: [
-              { services: [SERVICE_UUID] },
               { namePrefix: 'JDY' },
-              { namePrefix: 'BT' }
+              { namePrefix: 'BT' },
+              { namePrefix: 'HM' },
+              { namePrefix: 'Robot' },
+              { namePrefix: 'Car' }
             ],
-            optionalServices: [SERVICE_UUID]
+            optionalServices: CANDIDATE_SERVICES
           };
 
       const device = await navigator.bluetooth.requestDevice(options);
@@ -73,19 +86,61 @@ class BleService {
       });
 
       this.setStatus('connecting', this.deviceName);
-      if (!device.gatt) throw new Error('Device does not have GATT server');
+      if (!device.gatt) throw new Error('Device does not have a GATT server');
 
       const server = await device.gatt.connect();
 
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      this.txCharacteristic = await service.getCharacteristic(WRITE_CHAR_UUID);
+      // Resolve primary service with fallbacks
+      let service: BluetoothRemoteGATTService | null = null;
+      for (const uuid of CANDIDATE_SERVICES) {
+        try {
+          service = await server.getPrimaryService(uuid);
+          if (service) break;
+        } catch (_) {}
+      }
 
+      if (!service && server.getPrimaryServices) {
+        try {
+          const all = await server.getPrimaryServices();
+          service = all.find(s =>
+            s.uuid.toLowerCase().includes('ffe0') ||
+            s.uuid.toLowerCase().includes('fff0') ||
+            s.uuid.toLowerCase().includes('dfb0')
+          ) || all[0] || null;
+        } catch (_) {}
+      }
+
+      if (!service) {
+        service = await server.getPrimaryService(STANDARD_WRITE_CHAR.replace('ffe1', 'ffe0'));
+      }
+
+      // Resolve writable characteristic
+      let tx: BluetoothRemoteGATTCharacteristic | null = null;
+      if (service.getCharacteristics) {
+        try {
+          const chars = await service.getCharacteristics();
+          tx = chars.find(c =>
+            c.uuid.toLowerCase().includes('ffe1') &&
+            (c.properties?.write || c.properties?.writeWithoutResponse)
+          ) || null;
+
+          if (!tx) {
+            tx = chars.find(c => c.properties?.write || c.properties?.writeWithoutResponse) || null;
+          }
+        } catch (_) {}
+      }
+
+      if (!tx) {
+        tx = await service.getCharacteristic(STANDARD_WRITE_CHAR);
+      }
+
+      this.txCharacteristic = tx;
       this.setStatus('connected', this.deviceName);
       return true;
     } catch (err: any) {
       this.setStatus('disconnected');
       if (err.name === 'NotFoundError') {
-        // User cancelled picker
+        // User cancelled picker dialog
         return false;
       }
       throw err;
@@ -107,7 +162,7 @@ class BleService {
   }
 
   public queueDriveCommand(cmd: string) {
-    this.latestDriveCmd = cmd;
+    this.latestDriveCmd = cmd.endsWith('\n') ? cmd : `${cmd}\n`;
     this.pump();
   }
 
@@ -120,15 +175,24 @@ class BleService {
 
   public async sendRawCommand(cmd: string): Promise<void> {
     if (!this.txCharacteristic || this.status !== 'connected') return;
+    const payload = cmd.endsWith('\n') ? cmd : `${cmd}\n`;
+    await this.writeData(payload);
+  }
+
+  private async writeData(data: string): Promise<boolean> {
+    if (!this.txCharacteristic || this.status !== 'connected') return false;
     try {
-      const bytes = new TextEncoder().encode(cmd);
-      if (this.txCharacteristic.writeValueWithoutResponse) {
+      const bytes = new TextEncoder().encode(data);
+      const props = this.txCharacteristic.properties;
+      if (props?.writeWithoutResponse && this.txCharacteristic.writeValueWithoutResponse) {
         await this.txCharacteristic.writeValueWithoutResponse(bytes);
       } else {
         await this.txCharacteristic.writeValue(bytes);
       }
+      return true;
     } catch (err) {
-      console.warn('Raw command error:', cmd, err);
+      console.warn('GATT write error:', data, err);
+      return false;
     }
   }
 
@@ -140,7 +204,7 @@ class BleService {
       this.stopPending = false;
       this.latestDriveCmd = null;
       this.latestJoystick = null;
-      payload = '%S';
+      payload = '%S\n';
     } else if (this.latestDriveCmd !== null) {
       payload = this.latestDriveCmd;
       this.latestDriveCmd = null;
@@ -153,16 +217,8 @@ class BleService {
 
     this.writeBusy = true;
     try {
-      const bytes = new TextEncoder().encode(payload);
-      if (this.txCharacteristic.writeValueWithoutResponse) {
-        await this.txCharacteristic.writeValueWithoutResponse(bytes);
-      } else {
-        await this.txCharacteristic.writeValue(bytes);
-      }
-    } catch (err) {
-      console.warn('GATT pump error:', err);
+      await this.writeData(payload);
     } finally {
-      // 50ms throttle between transmissions
       setTimeout(() => {
         this.writeBusy = false;
         this.pump();

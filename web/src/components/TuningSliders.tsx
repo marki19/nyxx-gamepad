@@ -57,7 +57,8 @@ export const TuningSliders: React.FC<TuningSlidersProps> = ({
   const handleSpeed = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
     onSpeedChange(val);
-    ble.sendRawCommand(`%V${val}#`);
+    ble.sendRawCommand(`%V${val}#\n`);
+    ble.sendRawCommand(`%${val}+#\n`);
   };
 
   return (

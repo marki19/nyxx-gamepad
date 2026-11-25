@@ -26,12 +26,14 @@ export const App: React.FC = () => {
 
       if (newStatus === 'connected') {
         setIsModalOpen(false);
-        // Send initial saved distance, follow limits, and speed on connect
-        ble.sendRawCommand(`%D${distance}#`);
-        setTimeout(() => ble.sendRawCommand(`%N${followNear}#`), 40);
-        setTimeout(() => ble.sendRawCommand(`%C${followFar}#`), 80);
-        setTimeout(() => ble.sendRawCommand(`%M${followRange}#`), 120);
-        setTimeout(() => ble.sendRawCommand(`%V${speed}#`), 160);
+        // Send initial saved distance, follow limits, speed, and enter G_Drive
+        ble.sendRawCommand(`%D${distance}#\n`);
+        setTimeout(() => ble.sendRawCommand(`%N${followNear}#\n`), 40);
+        setTimeout(() => ble.sendRawCommand(`%C${followFar}#\n`), 80);
+        setTimeout(() => ble.sendRawCommand(`%M${followRange}#\n`), 120);
+        setTimeout(() => ble.sendRawCommand(`%V${speed}#\n`), 160);
+        setTimeout(() => ble.sendRawCommand(`%${speed}+#\n`), 200);
+        setTimeout(() => ble.sendRawCommand('%G#\n'), 240);
       } else if (newStatus === 'disconnected') {
         setActiveMode(null);
       }
@@ -49,14 +51,15 @@ export const App: React.FC = () => {
     // Tapping the active button disables/untoggles it
     if (activeMode === cmd) {
       setActiveMode(null);
-      await ble.sendRawCommand('%Q');
+      await ble.sendRawCommand('%Q\n');
+      setTimeout(() => ble.sendRawCommand('%G#\n'), 60);
       return;
     }
 
     // If another mode is active, halt it first
     if (activeMode !== null) {
-      await ble.sendRawCommand('%Q');
-      await new Promise((r) => setTimeout(r, 300));
+      await ble.sendRawCommand('%Q\n');
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     setActiveMode(cmd);
@@ -66,7 +69,8 @@ export const App: React.FC = () => {
   const handleStopAll = useCallback(() => {
     setActiveMode(null);
     ble.queueStop();
-    ble.sendRawCommand('%Q');
+    ble.sendRawCommand('%Q\n');
+    setTimeout(() => ble.sendRawCommand('%G#\n'), 60);
   }, []);
 
   const handleHeaderConnectClick = () => {
