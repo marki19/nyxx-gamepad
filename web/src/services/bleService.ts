@@ -1,12 +1,9 @@
 // BLE Service for JDY-16 / BT05 Arduino Robot Car Remote
 
-const CANDIDATE_SERVICES: BluetoothServiceUUID[] = [
+const CANDIDATE_SERVICES: string[] = [
   '0000ffe0-0000-1000-8000-00805f9b34fb',
-  0xffe0,
   '0000fff0-0000-1000-8000-00805f9b34fb',
-  0xfff0,
   '0000dfb0-0000-1000-8000-00805f9b34fb',
-  0xdfb0,
   '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
 ];
 
@@ -111,7 +108,7 @@ class BleService {
       }
 
       if (!service) {
-        service = await server.getPrimaryService(STANDARD_WRITE_CHAR.replace('ffe1', 'ffe0'));
+        service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
       }
 
       // Resolve writable characteristic
@@ -139,8 +136,10 @@ class BleService {
       return true;
     } catch (err: any) {
       this.setStatus('disconnected');
-      if (err.name === 'NotFoundError') {
-        // User cancelled picker dialog
+      console.warn('Bluetooth requestDevice/connect error:', err);
+      const msg = (err.message || '').toLowerCase();
+      // Only silently return false if user explicitly clicked "Cancel" on the native device list
+      if (err.name === 'NotFoundError' && (msg.includes('user cancelled') || msg.includes('user canceled') || msg.includes('cancelled chooser'))) {
         return false;
       }
       throw err;
